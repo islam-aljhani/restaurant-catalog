@@ -44,10 +44,8 @@
   <div class="dh">طلب عرض سعر <button id="closeCart" aria-label="إغلاق">×</button></div>
   <div class="items" id="items"></div>
   <div class="df">
-    <input id="cname" placeholder="اسمك" autocomplete="name">
-    <input id="rname" placeholder="اسم المطعم">
-    <input id="cphone" placeholder="رقم الهاتف" inputmode="tel" autocomplete="tel">
-    <input id="ccity" placeholder="المدينة / العنوان">
+    <input id="rname" placeholder="اسم المطعم أو اسمك" autocomplete="organization">
+    <div class="hint">رقم هاتفك يصلنا تلقائياً مع رسالة واتساب.</div>
     <button class="wa" id="send">أرسل الطلب عبر واتساب</button>
   </div>
 </aside>
@@ -63,9 +61,11 @@
         <div class="qty"><button data-d="1">+</button><input id="lbq" value="1" inputmode="numeric"><button data-d="-1">−</button></div>
         <button class="add" id="lbadd">أضف للطلب</button>
       </div>
+      <button class="share" id="lbshare">↗ مشاركة هذا الصنف</button>
     </div>
   </div>
 </div>
+<div class="sbar" id="sbar" hidden><span id="sbtxt"></span><button id="sbgo">أرسل الطلب ←</button></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -97,6 +97,8 @@ function renderTiles() {
   $('#tiles').querySelectorAll('.tile').forEach(b => b.onclick = () => { location.hash = 'c=' + encodeURIComponent(b.dataset.g); });
 }
 function route() {
+  const pm = location.hash.match(/p=(A-\d+)/);
+  if (pm && P[pm[1]]) { group = P[pm[1]].g; $('#landing').hidden = true; $('#catalog').hidden = false; renderChips(); apply(); openLB(pm[1]); return; }
   const m = location.hash.match(/c=([^&]+)/);
   if (m) { group = decodeURIComponent(m[1]); $('#landing').hidden = true; $('#catalog').hidden = false; renderChips(); apply(); window.scrollTo(0, 0); }
   else { $('#catalog').hidden = true; $('#landing').hidden = false; }
@@ -128,6 +130,7 @@ function card(p) {
         <div class="qty"><button data-d="1">+</button><input value="1" inputmode="numeric"><button data-d="-1">−</button></div>
         <button class="add" data-id="${p.id}">أضف للطلب</button>
       </div>
+      <button class="share" data-id="${p.id}">↗ مشاركة</button>
     </div></div>`;
 }
 function more() {
@@ -169,16 +172,19 @@ function renderCart() {
   $('#items').querySelectorAll('.qty input').forEach(n => n.onchange = () => { cart[n.dataset.i].q = Math.max(1, +n.value || 1); saveCart(); renderCart(); });
   $('#items').querySelectorAll('.x').forEach(b => b.onclick = () => { cart.splice(+b.dataset.i, 1); saveCart(); renderCart(); });
   $('#send').disabled = !cart.length;
+  const n = cart.length, q = cart.reduce((a, x) => a + x.q, 0);
+  $('#sbar').hidden = !n; document.body.classList.toggle('has-sbar', !!n);
+  $('#sbtxt').textContent = n ? `طلبك: ${n === 1 ? 'صنف واحد' : n === 2 ? 'صنفان' : n <= 10 ? n + ' أصناف' : n + ' صنفاً'} · ${q} قطعة` : '';
 }
 const openC = o => { $('#drawer').classList.toggle('open', o); $('#ov').classList.toggle('open', o); };
 $('#openCart').onclick = () => openC(true); $('#closeCart').onclick = $('#ov').onclick = () => openC(false);
-['cname', 'rname', 'cphone', 'ccity'].forEach(k => { try { $('#' + k).value = localStorage.getItem('f_' + k) || ''; } catch (e) {} });
+['rname'].forEach(k => { try { $('#' + k).value = localStorage.getItem('f_' + k) || ''; } catch (e) {} });
 
 function localNo() { const d = new Date(), p = n => String(n).padStart(2, '0');
   return `Q-${String(d.getFullYear()).slice(2)}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${Math.floor(Math.random() * 10)}`; }
 $('#send').onclick = async () => {
-  const f = {}; ['cname', 'rname', 'cphone', 'ccity'].forEach(k => { f[k] = $('#' + k).value.trim(); try { localStorage.setItem('f_' + k, f[k]); } catch (e) {} });
-  if (!f.cname && !f.rname) { toast('اكتب اسمك أو اسم المطعم'); return; }
+  const f = { cname: '', cphone: '', ccity: '' }; ['rname'].forEach(k => { f[k] = $('#' + k).value.trim(); try { localStorage.setItem('f_' + k, f[k]); } catch (e) {} });
+  if (!f.rname) { toast('اكتب اسم المطعم أو اسمك'); $('#rname').focus(); return; }
   const lines = cart.map(x => { const p = P[x.id]; return { vid: `${p.id}-${p.v[x.v].k}`, id: p.id, ar: p.ar, size: p.v[x.v].ar, q: x.q }; });
   const order = { c: f.cname, r: f.rname, ph: f.cphone, city: f.ccity, lines };
   const btn = $('#send'); btn.disabled = true; btn.textContent = 'جارٍ الإرسال…';
@@ -191,12 +197,30 @@ $('#send').onclick = async () => {
   }
   if (!no) no = localNo();
   const txt = lines.map((l, i) => `${i + 1}) ${l.ar}\n   رقم الصنف: ${l.id} — المقاس: ${l.size} — الكمية: ${l.q}`).join('\n');
-  const msg = `طلب عرض سعر\nرقم الطلب: ${no}\n\nالاسم: ${f.cname || '-'}\nالمطعم: ${f.rname || '-'}\nالهاتف: ${f.cphone || '-'}\nالمدينة: ${f.ccity || '-'}\n\nالأصناف:\n${txt}`;
+  const msg = `طلب عرض سعر\nرقم الطلب: ${no}\nالمطعم / الاسم: ${f.rname}\n\nالأصناف:\n${txt}`;
   cart = []; saveCart(); renderCart(); openC(false);
   btn.textContent = 'أرسل الطلب عبر واتساب';
   location.href = `https://wa.me/${S.ownerWhatsApp}?text=${encodeURIComponent(msg)}`;
 };
 
+$('#sbgo').onclick = () => openC(true);
+/* share */
+const linkOf = id => location.origin + location.pathname + '#p=' + id;
+async function shareItem(id) {
+  const p = P[id], url = linkOf(id), text = `${p.ar} — ${p.v.map(v => v.ar).join(' / ')}\nاطلب عرض سعر من هنا:`;
+  try {
+    if (navigator.share) {
+      let files;
+      try { const b = await (await fetch(`img/${id}.jpg`)).blob(); const f = new File([b], `${id}.jpg`, { type: 'image/jpeg' });
+        if (navigator.canShare && navigator.canShare({ files: [f] })) files = [f]; } catch (e) {}
+      await navigator.share(files ? { files, text: text + '\n' + url } : { title: p.ar, text, url });
+      return;
+    }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  window.open(`https://wa.me/?text=${encodeURIComponent(text + '\n' + url)}`, '_blank');
+}
+document.addEventListener('click', e => { const b = e.target.closest('.share'); if (!b) return;
+  e.stopPropagation(); shareItem(b.dataset.id || (LB && LB.id)); });
 /* lightbox */
 let LB = null;
 function openLB(id) {
@@ -205,7 +229,8 @@ function openLB(id) {
   $('#lbsize').innerHTML = p.v.length > 1 ? `<select id="lbv">${p.v.map((v, i) => `<option value="${i}">${esc(v.ar)}</option>`).join('')}</select>` : `<div class="code">المقاس: ${esc(p.v[0].ar)}</div>`;
   $('#lbq').value = 1; $('#lbimg').classList.remove('z'); $('#lb').classList.add('open'); document.body.style.overflow = 'hidden';
 }
-function closeLB() { $('#lb').classList.remove('open'); document.body.style.overflow = ''; }
+function closeLB() { $('#lb').classList.remove('open'); document.body.style.overflow = '';
+  if (/p=A-/.test(location.hash)) history.replaceState(null, '', '#c=' + encodeURIComponent(group)); }
 $('#lbx').onclick = closeLB; $('#lb').onclick = e => { if (e.target.id === 'lb') closeLB(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLB(); });
 $('#lbimg').onclick = e => { const box = $('#lbimg'), img = $('#lbpic');
