@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>كتالوج أدوات المطاعم</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Tajawal:wght@400;500;700;800&family=Almarai:wght@400;700;800&family=Amiri:wght@700&family=Readex+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="config.js"></script>
+</head>
+<body>
+<section class="landing" id="landing">
+  <div class="hero">
+    <div class="hlogo" id="hName"></div>
+    <h1>مرحباً بك في موقع الطلب</h1>
+    <p>حيث يمكنك طلب ما تريد من الإكسسوارات. اختر التصنيف، ثم أضف الأصناف إلى طلبك وأرسله عبر واتساب.</p>
+    <button class="cartbtn hcart" id="hCart">طلبي <b id="hcnt">0</b></button>
+  </div>
+  <div class="tiles" id="tiles"></div>
+</section>
+<div id="catalog" hidden>
+<header>
+  <div class="bar">
+    <button class="back" id="back">→ التصنيفات</button>
+    <div class="logo"><span id="siteName"></span><small id="tagline"></small></div>
+    <input class="search" id="q" placeholder="ابحث باسم الصنف أو الرقم…">
+    <button class="cartbtn" id="openCart">طلبي <b id="cnt">0</b></button>
+  </div>
+  <div class="chips" id="chips"></div>
+  <div class="filters">
+    <select id="series"><option value="">كل التشكيلات (التصاميم)</option></select>
+  </div>
+</header>
+<main>
+  <p class="count" id="count"></p>
+  <div class="grid" id="grid"></div>
+  <button class="more" id="more" hidden>عرض المزيد</button>
+</main>
+</div>
+
+<div class="ov" id="ov"></div>
+<aside class="drawer" id="drawer">
+  <div class="dh">طلب عرض سعر <button id="closeCart" aria-label="إغلاق">×</button></div>
+  <div class="items" id="items"></div>
+  <div class="df">
+    <input id="cname" placeholder="اسمك" autocomplete="name">
+    <input id="rname" placeholder="اسم المطعم">
+    <input id="cphone" placeholder="رقم الهاتف" inputmode="tel" autocomplete="tel">
+    <input id="ccity" placeholder="المدينة / العنوان">
+    <button class="wa" id="send">أرسل الطلب عبر واتساب</button>
+  </div>
+</aside>
+
+<div class="lb" id="lb">
+  <div class="lbbox">
+    <button class="lbx" id="lbx" aria-label="إغلاق">×</button>
+    <div class="lbimg" id="lbimg"><img id="lbpic" alt=""></div>
+    <div class="lbinfo">
+      <div class="nm" id="lbnm"></div><div class="code" id="lbcode"></div>
+      <div id="lbsize"></div>
+      <div class="row">
+        <div class="qty"><button data-d="1">+</button><input id="lbq" value="1" inputmode="numeric"><button data-d="-1">−</button></div>
+        <button class="add" id="lbadd">أضف للطلب</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const S = window.SITE; document.body.dataset.theme = S.theme || '0';
+document.title = S.name; siteName.textContent = S.name; tagline.textContent = S.tagline;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const toast = m => { const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 2400); };
+let DATA = null, P = {}, LIST = [], shown = 0, group = 'الكل';
+const PAGE = 48;
+let cart = []; try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch (e) {}
+const saveCart = () => { try { localStorage.setItem('cart', JSON.stringify(cart)); } catch (e) {} };
+
+fetch('data/products.json').then(r => r.json()).then(d => {
+  DATA = d; d.products.forEach(p => P[p.id] = p);
+  cart = cart.filter(x => P[x.id] && P[x.id].v[x.v]);
+  const ss = [...new Set(d.products.map(p => p.s))].sort((a, b) => a - b);
+  $('#series').insertAdjacentHTML('beforeend', ss.map(s => `<option value="${s}">تشكيلة ${s}</option>`).join(''));
+  renderTiles(); route(); renderCart();
+});
+const GICON = {};
+function renderTiles() {
+  $('#hName').textContent = S.name;
+  const gs = DATA.groups.filter(g => DATA.products.some(p => p.g === g));
+  const pick = g => { const L = DATA.products.filter(p => g === 'الكل' || p.g === g); return L[Math.min(L.length - 1, 6)]; };
+  $('#tiles').innerHTML = [...gs, 'الكل'].map(g => { const p = pick(g), n = DATA.products.filter(x => g === 'الكل' || x.g === g).length;
+    return `<button class="tile" data-g="${esc(g)}"><span class="ti"><img src="thumb/${p.id}.jpg" alt="" loading="lazy"></span>
+      <span class="tn">${g === 'الكل' ? 'كل الأصناف' : esc(g)}</span><span class="tc">${n} صنفاً</span></button>`; }).join('');
+  $('#tiles').querySelectorAll('.tile').forEach(b => b.onclick = () => { location.hash = 'c=' + encodeURIComponent(b.dataset.g); });
+}
+function route() {
+  const m = location.hash.match(/c=([^&]+)/);
+  if (m) { group = decodeURIComponent(m[1]); $('#landing').hidden = true; $('#catalog').hidden = false; renderChips(); apply(); window.scrollTo(0, 0); }
+  else { $('#catalog').hidden = true; $('#landing').hidden = false; }
+}
+window.addEventListener('hashchange', () => DATA && route());
+$('#back').onclick = () => { location.hash = ''; };
+$('#hCart').onclick = () => openC(true);
+
+function renderChips() {
+  const gs = ['الكل', ...DATA.groups.filter(g => DATA.products.some(p => p.g === g))];
+  $('#chips').innerHTML = gs.map(g => `<button class="chip ${g === group ? 'on' : ''}" data-g="${esc(g)}">${esc(g)}</button>`).join('');
+  $('#chips').querySelectorAll('.chip').forEach(b => b.onclick = () => { location.hash = 'c=' + encodeURIComponent(b.dataset.g); });
+}
+function apply() {
+  const q = $('#q').value.trim().toLowerCase(), s = $('#series').value;
+  LIST = DATA.products.filter(p => (group === 'الكل' || p.g === group) && (!s || p.s == s) &&
+    (!q || p.ar.includes(q) || p.id.toLowerCase().includes(q)));
+  $('#grid').innerHTML = ''; shown = 0; more();
+  $('#count').textContent = `${LIST.length} صنفاً`;
+}
+function card(p) {
+  return `<div class="card">
+    <div class="ph" data-id="${p.id}" title="اضغط للتكبير"><img src="thumb/${p.id}.jpg" alt="${esc(p.ar)}" loading="lazy"><span class="zm">⤢</span></div>
+    <div class="cb">
+      <div class="nm">${esc(p.ar)}</div>
+      <div class="code">رقم الصنف: ${p.id}<span class="series">تشكيلة ${p.s}</span></div>
+      ${p.v.length > 1 ? `<select>${p.v.map((v, i) => `<option value="${i}">${esc(v.ar)}</option>`).join('')}</select>` : `<div class="code">المقاس: ${esc(p.v[0].ar)}</div>`}
+      <div class="row">
+        <div class="qty"><button data-d="1">+</button><input value="1" inputmode="numeric"><button data-d="-1">−</button></div>
+        <button class="add" data-id="${p.id}">أضف للطلب</button>
+      </div>
+    </div></div>`;
+}
+function more() {
+  const part = LIST.slice(shown, shown + PAGE); shown += part.length;
+  const tmp = document.createElement('div'); tmp.innerHTML = part.map(card).join('');
+  [...tmp.children].forEach(c => { wire(c); $('#grid').appendChild(c); });
+  $('#more').hidden = shown >= LIST.length;
+  if (!LIST.length) $('#grid').innerHTML = '<div class="empty">لا توجد نتائج</div>';
+}
+function addToCart(id, v, q) {
+  const ex = cart.find(x => x.id === id && x.v === v); ex ? ex.q += q : cart.push({ id, v, q });
+  saveCart(); renderCart();
+}
+function wire(c) {
+  const ph = c.querySelector('.ph'); if (!ph) return;
+  ph.onclick = () => openLB(ph.dataset.id);
+  const inp = c.querySelector('.qty input');
+  c.querySelectorAll('.qty button').forEach(b => b.onclick = () => { inp.value = Math.max(1, (+inp.value || 1) + (+b.dataset.d)); });
+  const add = c.querySelector('.add');
+  add.onclick = () => {
+    const sel = c.querySelector('select');
+    addToCart(add.dataset.id, sel ? +sel.value : 0, Math.max(1, +inp.value || 1));
+    add.textContent = 'أُضيف ✓'; add.classList.add('done');
+    setTimeout(() => { add.textContent = 'أضف للطلب'; add.classList.remove('done'); }, 1200);
+  };
+}
+$('#more').onclick = more;
+new IntersectionObserver(es => { if (es[0].isIntersecting && DATA && shown < LIST.length) more(); }, { rootMargin: '600px' }).observe($('#more'));
+let qt; $('#q').oninput = () => { clearTimeout(qt); qt = setTimeout(apply, 200); };
+$('#series').onchange = apply;
+
+function renderCart() {
+  $('#cnt').textContent = $('#hcnt').textContent = cart.reduce((a, x) => a + x.q, 0);
+  $('#items').innerHTML = cart.length ? cart.map((x, i) => { const p = P[x.id], v = p.v[x.v];
+    return `<div class="it"><img src="thumb/${p.id}.jpg" alt=""><div class="t">${esc(p.ar)}<small>${p.id} · ${esc(v.ar)}</small></div>
+    <div class="qty"><button data-i="${i}" data-d="1">+</button><input value="${x.q}" data-i="${i}"><button data-i="${i}" data-d="-1">−</button></div>
+    <button class="x" data-i="${i}" aria-label="حذف">🗑</button></div>`; }).join('') : '<div class="empty">لم تضف أي صنف بعد</div>';
+  $('#items').querySelectorAll('.qty button').forEach(b => b.onclick = () => { const x = cart[b.dataset.i]; x.q = Math.max(1, x.q + (+b.dataset.d)); saveCart(); renderCart(); });
+  $('#items').querySelectorAll('.qty input').forEach(n => n.onchange = () => { cart[n.dataset.i].q = Math.max(1, +n.value || 1); saveCart(); renderCart(); });
+  $('#items').querySelectorAll('.x').forEach(b => b.onclick = () => { cart.splice(+b.dataset.i, 1); saveCart(); renderCart(); });
+  $('#send').disabled = !cart.length;
+}
+const openC = o => { $('#drawer').classList.toggle('open', o); $('#ov').classList.toggle('open', o); };
+$('#openCart').onclick = () => openC(true); $('#closeCart').onclick = $('#ov').onclick = () => openC(false);
+['cname', 'rname', 'cphone', 'ccity'].forEach(k => { try { $('#' + k).value = localStorage.getItem('f_' + k) || ''; } catch (e) {} });
+
+function localNo() { const d = new Date(), p = n => String(n).padStart(2, '0');
+  return `Q-${String(d.getFullYear()).slice(2)}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${Math.floor(Math.random() * 10)}`; }
+$('#send').onclick = async () => {
+  const f = {}; ['cname', 'rname', 'cphone', 'ccity'].forEach(k => { f[k] = $('#' + k).value.trim(); try { localStorage.setItem('f_' + k, f[k]); } catch (e) {} });
+  if (!f.cname && !f.rname) { toast('اكتب اسمك أو اسم المطعم'); return; }
+  const lines = cart.map(x => { const p = P[x.id]; return { vid: `${p.id}-${p.v[x.v].k}`, id: p.id, ar: p.ar, size: p.v[x.v].ar, q: x.q }; });
+  const order = { c: f.cname, r: f.rname, ph: f.cphone, city: f.ccity, lines };
+  const btn = $('#send'); btn.disabled = true; btn.textContent = 'جارٍ الإرسال…';
+  let no = '';
+  if (S.appsScriptUrl) {
+    try {
+      const res = await fetch(S.appsScriptUrl, { method: 'POST', body: JSON.stringify({ action: 'order', order }) });
+      const j = await res.json(); no = j.no || '';
+    } catch (e) {}
+  }
+  if (!no) no = localNo();
+  const txt = lines.map((l, i) => `${i + 1}) ${l.ar}\n   رقم الصنف: ${l.id} — المقاس: ${l.size} — الكمية: ${l.q}`).join('\n');
+  const msg = `طلب عرض سعر\nرقم الطلب: ${no}\n\nالاسم: ${f.cname || '-'}\nالمطعم: ${f.rname || '-'}\nالهاتف: ${f.cphone || '-'}\nالمدينة: ${f.ccity || '-'}\n\nالأصناف:\n${txt}`;
+  cart = []; saveCart(); renderCart(); openC(false);
+  btn.textContent = 'أرسل الطلب عبر واتساب';
+  location.href = `https://wa.me/${S.ownerWhatsApp}?text=${encodeURIComponent(msg)}`;
+};
+
+/* lightbox */
+let LB = null;
+function openLB(id) {
+  const p = P[id]; LB = p; $('#lbpic').src = `img/${p.id}.jpg`; $('#lbnm').textContent = p.ar;
+  $('#lbcode').textContent = `رقم الصنف: ${p.id} · تشكيلة ${p.s}`;
+  $('#lbsize').innerHTML = p.v.length > 1 ? `<select id="lbv">${p.v.map((v, i) => `<option value="${i}">${esc(v.ar)}</option>`).join('')}</select>` : `<div class="code">المقاس: ${esc(p.v[0].ar)}</div>`;
+  $('#lbq').value = 1; $('#lbimg').classList.remove('z'); $('#lb').classList.add('open'); document.body.style.overflow = 'hidden';
+}
+function closeLB() { $('#lb').classList.remove('open'); document.body.style.overflow = ''; }
+$('#lbx').onclick = closeLB; $('#lb').onclick = e => { if (e.target.id === 'lb') closeLB(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLB(); });
+$('#lbimg').onclick = e => { const box = $('#lbimg'), img = $('#lbpic');
+  if (box.classList.toggle('z')) { const r = box.getBoundingClientRect(); img.style.transformOrigin = `${(e.clientX - r.left) / r.width * 100}% ${(e.clientY - r.top) / r.height * 100}%`; } };
+$('#lbimg').onmousemove = e => { const box = $('#lbimg'); if (!box.classList.contains('z')) return; const r = box.getBoundingClientRect();
+  $('#lbpic').style.transformOrigin = `${(e.clientX - r.left) / r.width * 100}% ${(e.clientY - r.top) / r.height * 100}%`; };
+document.querySelectorAll('#lb .qty button').forEach(b => b.onclick = () => { $('#lbq').value = Math.max(1, (+$('#lbq').value || 1) + (+b.dataset.d)); });
+$('#lbadd').onclick = () => { const v = $('#lbv') ? +$('#lbv').value : 0, q = Math.max(1, +$('#lbq').value || 1);
+  addToCart(LB.id, v, q); const b = $('#lbadd'); b.textContent = 'أُضيف ✓'; b.classList.add('done');
+  setTimeout(() => { b.textContent = 'أضف للطلب'; b.classList.remove('done'); }, 1200); toast(`أُضيف ${LB.ar} × ${q}`); };
+</script>
+</body>
+</html>

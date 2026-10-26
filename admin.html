@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>الطلبات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Tajawal:wght@400;500;700;800&family=Almarai:wght@400;700;800&family=Amiri:wght@700&family=Readex+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+</head>
+<body>
+<main>
+  <div class="panel login" id="login">
+    <h2>صفحة الطلبات</h2>
+    <div class="meta">اكتب كلمة السر التي وضعتها في إعداد Google Sheet.</div>
+    <input id="key" type="password" placeholder="كلمة السر">
+    <button class="xl" id="enter" style="border:0;border-radius:10px;padding:11px 18px;font-weight:700;cursor:pointer">دخول</button>
+    <div class="note" id="lerr" hidden></div>
+  </div>
+
+  <div id="app" hidden>
+    <div class="panel find">
+      <h2>الطلبات</h2>
+      <div class="fr"><input id="fNo" placeholder="اكتب رقم الطلب، مثال: Q-261026-001"><button class="xl" id="fBtn">عرض الطلب</button></div>
+      <div class="tools">
+        <select id="fSt"><option value="">كل الحالات</option></select>
+        <button class="tg" id="reload" style="border:0;border-radius:10px;padding:9px 14px;cursor:pointer">تحديث</button>
+      </div>
+      <div id="olist" class="olist"></div>
+    </div>
+    <div class="panel" id="opanel" style="margin-top:16px;display:none">
+      <h2>طلب <span id="aNo"></span> <span id="aSt"></span></h2>
+      <div class="meta" id="aMeta"></div>
+      <div class="tw"><table>
+        <thead><tr><th>#</th><th>الصورة</th><th>رقمنا</th><th>Model No.</th><th>Catalog / Page</th><th>Description</th><th>الكمية</th></tr></thead>
+        <tbody id="aBody"></tbody>
+      </table></div>
+      <div class="sh">حالة الطلب</div><div class="steps" id="steps"></div>
+      <div class="acts">
+        <button class="xl" id="dlXl">١. تحميل ملف الإكسل للمورّد</button>
+        <button class="wa" id="waAyse">٢. افتح محادثة المورّد</button>
+      </div>
+      <div class="note">بعد فتح المحادثة: أرفق ملف الإكسل الذي حمّلته (واتساب لا يسمح للموقع بإرفاقه تلقائياً).</div>
+    </div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+const S = window.SITE; document.body.dataset.theme = S.theme || '0';
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const toast = m => { const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 2400); };
+let KEY = ''; try { KEY = localStorage.getItem('adminKey') || ''; } catch (e) {}
+let ORD = [], ORIG = {}, ADM = null;
+const STEPS = [['sent','أُرسل للمورّد'],['priced','وصلت أسعار المورّد'],['replied','تم الرد على الزبون'],['done','تم البيع'],['cancel','ملغي']];
+const stCls = { sent: 'b1', priced: 'b2', replied: 'b3', done: 'ok', cancel: 'gr' };
+const fmt = t => t ? new Date(t).toLocaleString('ar-LY', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+const cur = o => { let k = null; for (const [s] of STEPS) if (o.st && o.st[s]) k = s; return k; };
+const badge = o => { const k = cur(o); if (!k) return `<span class="st no">جديد — لم يُرسل للمورّد</span>`;
+  return `<span class="st ${stCls[k]}">${STEPS.find(x => x[0] === k)[1]}<small>${fmt(o.st[k])}</small></span>`; };
+$('#fSt').insertAdjacentHTML('beforeend', '<option value="new">جديد</option>' + STEPS.map(([k, n]) => `<option value="${k}">${n}</option>`).join(''));
+
+async function api(params) {
+  const u = new URL(S.appsScriptUrl); Object.entries({ ...params, key: KEY }).forEach(([k, v]) => u.searchParams.set(k, v));
+  const r = await fetch(u); const j = await r.json(); if (j.error) throw new Error(j.error); return j;
+}
+async function post(body) {
+  const r = await fetch(S.appsScriptUrl, { method: 'POST', body: JSON.stringify({ ...body, key: KEY }) });
+  const j = await r.json(); if (j.error) throw new Error(j.error); return j;
+}
+async function start() {
+  if (!S.appsScriptUrl) { $('#lerr').hidden = false; $('#lerr').textContent = 'لم يُضَف رابط Google Apps Script في config.js بعد.'; return; }
+  try {
+    const [o, g] = await Promise.all([api({ action: 'orders' }), api({ action: 'originals' })]);
+    ORD = o.orders; ORIG = g.originals;
+    try { localStorage.setItem('adminKey', KEY); } catch (e) {}
+    $('#login').hidden = true; $('#app').hidden = false; renderList();
+  } catch (e) { $('#lerr').hidden = false; $('#lerr').textContent = e.message === 'auth' ? 'كلمة السر غير صحيحة' : 'تعذّر الاتصال: ' + e.message; }
+}
+$('#enter').onclick = () => { KEY = $('#key').value.trim(); start(); };
+$('#key').onkeydown = e => { if (e.key === 'Enter') $('#enter').click(); };
+if (KEY) start();
+$('#reload').onclick = async () => { const o = await api({ action: 'orders' }); ORD = o.orders; renderList(); if (ADM) showOrder(ADM.no, true); toast('تم التحديث'); };
+$('#fSt').onchange = renderList;
+
+function renderList() {
+  const f = $('#fSt').value;
+  const L = ORD.filter(o => !f || (f === 'new' ? !cur(o) : cur(o) === f));
+  $('#olist').innerHTML = `<div class="tw"><table class="ot"><thead><tr><th>رقم الطلب</th><th>الزبون</th><th>المطعم</th><th>تاريخ الطلب</th><th>الأصناف</th><th>الحالة</th></tr></thead><tbody>${
+    L.map(o => `<tr data-no="${esc(o.no)}"><td><b>${esc(o.no)}</b></td><td>${esc(o.c || '-')}</td><td>${esc(o.r || '-')}</td><td>${fmt(o.t)}</td><td>${o.lines.length}</td><td>${badge(o)}</td></tr>`).join('')
+  }</tbody></table></div>` + (L.length ? '' : '<div class="empty">لا توجد طلبات</div>');
+  $('#olist').querySelectorAll('tr[data-no]').forEach(r => r.onclick = () => { $('#fNo').value = r.dataset.no; showOrder(r.dataset.no); });
+}
+const orig = vid => ORIG[vid] || {};
+function showOrder(no, keep) {
+  no = (no || '').trim().toUpperCase(); const o = ORD.find(x => x.no.toUpperCase() === no);
+  if (!o) { $('#opanel').style.display = 'none'; toast('لا يوجد طلب بهذا الرقم'); return; }
+  ADM = o; $('#opanel').style.display = 'block'; $('#aNo').textContent = o.no; $('#aSt').innerHTML = badge(o);
+  $('#aMeta').textContent = `تاريخ الطلب: ${fmt(o.t)} · الزبون: ${o.c || '-'} · المطعم: ${o.r || '-'} · الهاتف: ${o.ph || '-'} · المدينة: ${o.city || '-'}`;
+  $('#aBody').innerHTML = o.lines.map((l, i) => { const g = orig(l.vid);
+    return `<tr><td>${i + 1}</td><td><img src="thumb/${l.id}.jpg" alt=""></td><td>${esc(l.id)}<br><small>${esc(l.size)}</small></td>
+    <td class="en"><b>${esc(g.code || '?')}</b></td><td class="en">${esc(g.catalog || '')}${g.collection ? ' — ' + esc(g.collection) : ''} / p.${esc(g.page || '')}</td>
+    <td class="en">${esc(g.description || '')}${g.spec ? ' — ' + esc(g.spec) : ''}</td><td>${l.q}</td></tr>`; }).join('');
+  o.st = o.st || {};
+  $('#steps').innerHTML = STEPS.map(([k, n]) => `<button class="stp ${o.st[k] ? 'on' : ''}" data-k="${k}"><span>${o.st[k] ? '✓' : '○'} ${n}</span><small>${o.st[k] ? fmt(o.st[k]) : 'اضغط للتعليم'}</small></button>`).join('');
+  $('#steps').querySelectorAll('.stp').forEach(b => b.onclick = () => setStep(o, b.dataset.k, !o.st[b.dataset.k]));
+  if (!keep) $('#opanel').scrollIntoView({ behavior: 'smooth' });
+}
+async function setStep(o, k, on) {
+  const prev = o.st[k]; o.st[k] = on ? Date.now() : null; showOrder(o.no, true); renderList();
+  try { await post({ action: 'status', no: o.no, st: o.st }); } catch (e) { o.st[k] = prev; showOrder(o.no, true); renderList(); toast('لم يُحفظ: ' + e.message); }
+}
+$('#fBtn').onclick = () => showOrder($('#fNo').value);
+$('#fNo').onkeydown = e => { if (e.key === 'Enter') showOrder($('#fNo').value); };
+
+async function imgB64(src) {
+  const b = await (await fetch(src)).blob();
+  return new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(b); });
+}
+const dims = src => new Promise(r => { const i = new Image(); i.onload = () => r([i.naturalWidth, i.naturalHeight]); i.src = src; });
+$('#dlXl').onclick = async () => {
+  const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Request', { views: [{ showGridLines: false, state: 'frozen', ySplit: 6 }], pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
+  [5, 14, 18, 30, 46, 7, 12, 13].forEach((w, i) => ws.getColumn(i + 1).width = w);
+  const yellow = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } }, bd = { style: 'thin', color: { argb: 'FFBFBFBF' } }, B = { top: bd, left: bd, bottom: bd, right: bd };
+  ws.getCell('A1').value = 'Price Request'; ws.getCell('A1').font = { size: 16, bold: true, color: { argb: 'FF1F3A5F' } };
+  ws.getCell('A2').value = `To: ${S.supplier.name} — ${S.supplier.city}`;
+  ws.getCell('A3').value = `Request No.: ${ADM.no}`; ws.getCell('E3').value = 'Date: ' + new Date().toISOString().slice(0, 10);
+  ws.getCell('A4').value = 'Please fill in the yellow Unit Cost cells and send the file back. Currency:';
+  ws.getCell('F4').fill = yellow; ws.getCell('F4').border = B;
+  const hr = ws.getRow(6);
+  ['#', 'Image', 'Model No.', 'Catalog / Page', 'Description', 'Qty', 'Unit Cost', 'Total'].forEach((h, i) => { const c = hr.getCell(i + 1); c.value = h;
+    c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3A5F' } }; c.alignment = { horizontal: 'center', vertical: 'middle' }; c.border = B; });
+  hr.height = 22; let r = 7;
+  for (const [i, l] of ADM.lines.entries()) {
+    const g = orig(l.vid), row = ws.getRow(r);
+    [i + 1, '', g.code || '', `${g.catalog || ''}${g.collection ? ' — ' + g.collection : ''} / p.${g.page || ''}`, `${g.description || ''}${g.spec ? ' — ' + g.spec : ''}`, l.q, null, { formula: `F${r}*G${r}` }]
+      .forEach((val, j) => { const c = row.getCell(j + 1); c.value = val; c.border = B; c.alignment = { vertical: 'middle', horizontal: j === 4 || j === 3 ? 'left' : 'center', wrapText: true }; });
+    row.getCell(7).fill = yellow; row.getCell(7).numFmt = row.getCell(8).numFmt = '#,##0.00'; row.height = 68;
+    try {
+      const src = await imgB64(`thumb/${l.id}.jpg`); let [w, h] = await dims(src); const k = Math.min(86 / w, 82 / h); w = Math.round(w * k); h = Math.round(h * k);
+      ws.addImage(wb.addImage({ base64: src, extension: 'jpeg' }), { tl: { col: 1 + ((98 - w) / 2) / 98, row: r - 1 + ((90 - h) / 2) / 90 }, ext: { width: w, height: h } });
+    } catch (e) {}
+    r++;
+  }
+  ws.getCell(`G${r}`).value = 'Total'; ws.getCell(`G${r}`).font = { bold: true };
+  const t = ws.getCell(`H${r}`); t.value = { formula: `SUM(H7:H${r - 1})` }; t.font = { bold: true }; t.numFmt = '#,##0.00'; t.border = B;
+  const buf = await wb.xlsx.writeBuffer();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  a.download = `Price_Request_${ADM.no}.xlsx`; a.click(); toast('تم تحميل ملف الإكسل');
+};
+$('#waAyse').onclick = () => {
+  if (!ADM.st || !ADM.st.sent) setStep(ADM, 'sent', true);
+  const msg = `Merhaba ${S.supplier.name} Hanım,\nFiyat talebi ${ADM.no} ekteki Excel dosyasındadır (${ADM.lines.length} kalem). Sarı hücrelere birim fiyatları yazıp geri gönderebilir misiniz?\nTeşekkürler.`;
+  window.open(`https://wa.me/${S.supplier.whatsApp}?text=${encodeURIComponent(msg)}`, '_blank');
+};
+</script>
+</body>
+</html>
