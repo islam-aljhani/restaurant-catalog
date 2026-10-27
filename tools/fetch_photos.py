@@ -33,7 +33,7 @@ for n, sku in enumerate(todo, 1):
         page = get(f'https://www.idfine.com.tr/urun/{sku}').decode('utf-8', 'ignore')
     except Exception as e:
         print(n, 'page fail', repr(e)); continue
-    pg = page.replace('\\/', '/').replace('&amp;', '&')
+    pg = re.sub(r'\\+/', '/', page).replace('&amp;', '&')
     hits = re.findall(r'cdn\.idfine\.com\.tr/products/(\d+)/([A-Za-z0-9_.\-]+?)\.(webp|jpg|jpeg|png)', pg)
     base = {}
     for folder, name, ext in hits:
