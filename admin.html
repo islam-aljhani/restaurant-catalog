@@ -170,7 +170,7 @@ $('#dlXl').onclick = async () => {
   ws.getCell('F4').value = RC; ws.getCell('F4').font = { bold: true, size: 12, color: { argb: 'FFC00000' } }; ws.getCell('F4').alignment = { horizontal: 'center' };
   ws.getCell('F4').dataValidation = { type: 'list', allowBlank: false, formulae: ['"TRY,USD,EUR,CNY"'] };
   ws.getCell('F4').fill = yellow; ws.getCell('F4').border = B;
-  ws.getCell('A5').value = `Lütfen birim fiyatları ${RC} olarak yazınız.`; ws.getCell('A5').font = { italic: true, color: { argb: 'FF666666' } };
+  ws.getCell('A5').value = `Lütfen birim fiyatları ${RC} olarak yazınız.  ⚠ Temin edilemeyen veya şu anda stokta olmayan ürünlerin fiyatına 0 (sıfır) yazınız.`; ws.getCell('A5').font = { bold: true, color: { argb: 'FFC00000' } };
   const hr = ws.getRow(6);
   ['#', 'Image', 'Model No.', 'Catalog / Page', 'Description', 'Qty', `Unit Cost (${RC})`, `Total (${RC})`].forEach((h, i) => { const c = hr.getCell(i + 1); c.value = h;
     c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3A5F' } }; c.alignment = { horizontal: 'center', vertical: 'middle' }; c.border = B; });
@@ -187,6 +187,9 @@ $('#dlXl').onclick = async () => {
     r++;
   }
   ws.getCell(`G${r}`).value = 'Total'; ws.getCell(`G${r}`).font = { bold: true };
+  ws.mergeCells(`A${r + 2}:H${r + 2}`); const nt = ws.getCell(`A${r + 2}`);
+  nt.value = '⚠ If an item is not available or cannot be supplied, write 0 (zero) in its Unit Cost cell.  /  Temin edilemeyen veya stokta olmayan ürün için birim fiyata 0 (sıfır) yazınız.';
+  nt.font = { bold: true, color: { argb: 'FFC00000' } }; nt.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDECEA' } }; nt.alignment = { wrapText: true, vertical: 'middle' }; ws.getRow(r + 2).height = 34;
   const t = ws.getCell(`H${r}`); t.value = { formula: `SUM(H7:H${r - 1})` }; t.font = { bold: true }; t.numFmt = `#,##0.00 "${RC}"`; t.border = B;
   const buf = await wb.xlsx.writeBuffer();
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
@@ -194,7 +197,7 @@ $('#dlXl').onclick = async () => {
 };
 $('#waAyse').onclick = () => {
   if (!ADM.st || !ADM.st.sent) setStep(ADM, 'sent', true);
-  const msg = `Merhaba ${S.supplier.name} Hanım,\nFiyat talebi ${ADM.no} ekteki Excel dosyasındadır (${ADM.lines.length} kalem). Sarı hücrelere birim fiyatları ${$('#reqCur').value} olarak yazıp geri gönderebilir misiniz?\nTeşekkürler.`;
+  const msg = `Merhaba ${S.supplier.name} Hanım,\nFiyat talebi ${ADM.no} ekteki Excel dosyasındadır (${ADM.lines.length} kalem). Sarı hücrelere birim fiyatları ${$('#reqCur').value} olarak yazıp geri gönderebilir misiniz? Stokta olmayan ürün için 0 yazınız.\nTeşekkürler.`;
   window.open(`https://wa.me/${S.supplier.whatsApp}?text=${encodeURIComponent(msg)}`, '_blank');
 };
 
@@ -215,12 +218,12 @@ const pct = (a, b) => b ? ((a - b) / b) * 100 : null;
 const sgn = x => x == null ? '' : `<span class="${x > 0.5 ? 'up' : x < -0.5 ? 'dn' : 'eq'}">${x > 0 ? '+' : ''}${x.toFixed(1)}%</span>`;
 function lastOf(vid, no) { return PRICES.filter(p => p.vid === vid && p.no !== no && p.cost !== '' && p.cost != null).sort((a, b) => b.t - a.t)[0]; }
 const landed = c => c == null ? null : c * +$('#qRate').value * (1 + +$('#qShip').value / 100);
-function rowsQ(q) { return ADM.lines.map((l, i) => { const c = q.cost[i], s = q.manual && q.manual[i] != null ? q.manual[i] : sellOf(c); return { l, i, c, s, cl: landed(c), last: lastOf(l.vid, ADM.no) }; }); }
+function rowsQ(q) { return ADM.lines.map((l, i) => { const c = q.cost[i], na = c === 0, s = na ? null : q.manual && q.manual[i] != null ? q.manual[i] : sellOf(c); return { l, i, c, na, s, cl: na ? null : landed(c), last: lastOf(l.vid, ADM.no) }; }); }
 function renderQuote() {
   const q = loadQ(ADM.no); $('#quote').hidden = !q; if (!q) return;
   if (q.cur) $('#qCur').value = q.cur;
   const R = rowsQ(q); let tot = 0, totC = 0, chg = [];
-  $('#qBody').innerHTML = R.map(({ l, i, c, s, cl, last }) => {
+  $('#qBody').innerHTML = R.map(({ l, i, c, na, s, cl, last }) => {
     const t = s == null ? null : s * l.q; if (t) tot += t; if (cl != null) totC += cl * l.q;
     let h = '<small class="mut">أول مرة</small>';
     if (last) {
@@ -228,8 +231,8 @@ function renderQuote() {
       h = `<small>${new Date(last.t).toLocaleDateString('ar-LY')} · ${esc(last.no)}</small><br>تكلفة: <span class="en">${money(+last.cost)} ${esc(last.cur)}</span> ${sgn(ch)}<br>بيع: ${money(+last.sell)} د.ل ${s == null ? '' : sgn(pct(s, +last.sell))}`;
     }
     return `<tr><td>${i + 1}</td><td>${esc(l.id)} ${esc(l.ar)}<br><small>${esc(l.size)}</small></td><td>${l.q}</td>
-      <td class="en">${c == null ? '<span class="warn">لا يوجد سعر</span>' : money(c) + ' ' + esc($('#qCur').value)}</td><td class="hist">${h}</td>
-      <td><input class="qin" data-i="${i}" type="number" step="0.5" value="${s ?? ''}"></td><td>${money(t)}</td></tr>`; }).join('');
+      <td class="en">${na ? '<span class="warn">غير متوفر عند المورّد</span>' : c == null ? '<span class="warn">لا يوجد سعر</span>' : money(c) + ' ' + esc($('#qCur').value)}</td><td class="hist">${h}</td>
+      <td>${na ? '—' : `<input class="qin" data-i="${i}" type="number" step="0.5" value="${s ?? ''}">`}</td><td>${money(t)}</td></tr>`; }).join('');
   $('#qTot').textContent = money(tot) + ' د.ل';
   const prof = tot - totC, avg = chg.length ? chg.reduce((a, b) => a + b, 0) / chg.length : null;
   $('#qSum').innerHTML = `<div>التكلفة الواصلة (مع الشحن): <b>${money(Math.round(totC))} د.ل</b></div><div>البيع: <b>${money(tot)} د.ل</b></div>
@@ -239,7 +242,7 @@ function renderQuote() {
 }
 async function savePrices(silent) {
   const q = loadQ(ADM.no); if (!q) return;
-  const rows = rowsQ(q).filter(r => r.c != null).map(r => ({ vid: r.l.vid, id: r.l.id, cost: r.c, cur: $('#qCur').value, rate: +$('#qRate').value, costL: Math.round(r.cl * 100) / 100, sell: r.s, q: r.l.q }));
+  const rows = rowsQ(q).filter(r => r.c != null && !r.na).map(r => ({ vid: r.l.vid, id: r.l.id, cost: r.c, cur: $('#qCur').value, rate: +$('#qRate').value, costL: Math.round(r.cl * 100) / 100, sell: r.s, q: r.l.q }));
   try { await post({ action: 'prices', no: ADM.no, rows }); const now = Date.now();
     PRICES = PRICES.filter(p => p.no !== ADM.no).concat(rows.map(r => ({ ...r, no: ADM.no, t: now }))); if (!silent) toast(`تم حفظ ${rows.length} سعر في الشيت`); }
   catch (e) { toast('لم تُحفظ الأسعار: ' + (e.message === 'unknown action' ? 'حدّث Apps Script أولاً' : e.message)); }
@@ -265,8 +268,8 @@ $('#upXl').onchange = async e => {
 };
 $('#qPdf').onclick = async () => {
   const q = loadQ(ADM.no); if (!q) return;
-  const rows = ADM.lines.map((l, i) => { const s = q.manual && q.manual[i] != null ? q.manual[i] : sellOf(q.cost[i]); return { l, s, t: s == null ? null : s * l.q }; });
-  if (rows.some(r => r.s == null) && !confirm('بعض الأصناف بلا سعر. ستظهر «يُحدَّد لاحقاً». هل تكمل؟')) return;
+  const rows = rowsQ(q).map(r => ({ l: r.l, s: r.s, na: r.na, t: r.s == null ? null : r.s * r.l.q }));
+  if (rows.some(r => r.s == null && !r.na) && !confirm('بعض الأصناف بلا سعر. ستظهر «يُحدَّد لاحقاً». هل تكمل؟')) return;
   const dep = +$('#qDep').value || 50, tot = rows.reduce((a, r) => a + (r.t || 0), 0), today = new Date(), until = new Date(Date.now() + (+$('#qDays').value || 7) * 864e5);
   const d = x => x.toLocaleDateString('ar-LY', { year: 'numeric', month: '2-digit', day: '2-digit' });
   const imgs = await Promise.all(rows.map(r => imgB64(thumb(r.l.id)).catch(() => '')));
@@ -275,13 +278,17 @@ $('#qPdf').onclick = async () => {
       <div class="qinfo"><div>رقم العرض: <b>${esc(ADM.no)}</b></div><div>التاريخ: ${d(today)}</div><div>صالح حتى: ${d(until)}</div><div>الزبون: <b>${esc(ADM.r || ADM.c || '-')}</b></div></div></div>` : `<div class="qhead small"><b>${esc(S.name)}</b> — عرض سعر ${esc(ADM.no)}</div>`}
     ${part.length || !last ? '' : `<div class="qtotbox">إجمالي العرض: <b>${money(tot)} د.ل</b> (${ADM.lines.length} صنف)</div>`}<table class="qt" ${part.length ? '' : 'style="display:none"'}><thead><tr><th>#</th><th>الصورة</th><th>الصنف</th><th>المقاس</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead><tbody>
     ${part.map(({ r, i }) => `<tr><td>${i + 1}</td><td>${imgs[i] ? `<img src="${imgs[i]}">` : ''}</td><td><b>${esc(r.l.ar)}</b><br><small>${esc(r.l.id)}</small></td><td>${esc(r.l.size)}</td><td>${r.l.q}</td>
-      <td>${r.s == null ? 'يُحدَّد لاحقاً' : money(r.s) + ' د.ل'}</td><td>${r.t == null ? '-' : money(r.t) + ' د.ل'}</td></tr>`).join('')}
+      <td>${r.na ? '<span class="qna">غير متوفر حالياً</span>' : r.s == null ? 'يُحدَّد لاحقاً' : money(r.s) + ' د.ل'}</td><td>${r.t == null ? '-' : money(r.t) + ' د.ل'}</td></tr>`).join('')}
     </tbody>${last ? `<tfoot><tr><td colspan="6">الإجمالي</td><td>${money(tot)} د.ل</td></tr></tfoot>` : ''}</table>
-    ${last ? `<div class="qterms"><div class="qth">الشروط والملاحظات</div><div class="qti"><span class="qn">1</span><span>الأسعار بالدينار الليبي وتشمل الشحن.</span></div><div class="qti"><span class="qn">2</span><span>هذا العرض صالح لمدة ${+$('#qDays').value || 7} أيام، حتى تاريخ ${d(until)}.</span></div><div class="qti"><span class="qn">3</span><span>عند الموافقة على العرض يُدفع عربون لا يقل عن ${dep}% من قيمة الطلبية (${money(Math.ceil(tot * dep / 100))} د.ل على الأقل).</span></div><div class="qti"><span class="qn">4</span><span>يمكن الدفع بجميع الطرق: نقداً (كاش) أو عن طريق المصرف.</span></div><div class="qti"><span class="qn">5</span><span>يبدأ تجهيز الطلبية بعد استلام العربون.</span></div><div class="qti"><span class="qn">6</span><span>عند جاهزية الطلبية نبلغكم بذلك، ولا تُسلَّم الطلبية إلا بعد سداد باقي قيمتها.</span></div><div class="qti"><span class="qn">7</span><span>لتأكيد الطلب راسلنا على واتساب مع ذكر رقم العرض: ${esc(ADM.no)}.</span></div></div>` : ''}
+    ${last ? `<div class="qterms"><div class="qth">الشروط والملاحظات</div><div class="qti"><span class="qn">1</span><span>الأسعار بالدينار الليبي وتشمل الشحن.</span></div><div class="qti"><span class="qn">2</span><span>هذا العرض صالح لمدة ${+$('#qDays').value || 7} أيام، حتى تاريخ ${d(until)}.</span></div><div class="qti"><span class="qn">3</span><span>عند الموافقة على العرض يُدفع عربون لا يقل عن ${dep}% من قيمة الطلبية (${money(Math.ceil(tot * dep / 100))} د.ل على الأقل).</span></div><div class="qti"><span class="qn">4</span><span>يمكن الدفع بجميع الطرق: نقداً (كاش) أو عن طريق المصرف.</span></div><div class="qti"><span class="qn">5</span><span>يبدأ تجهيز الطلبية بعد استلام العربون.</span></div><div class="qti"><span class="qn">6</span><span>عند تجهيز الطلبية بالكامل نبلغكم بذلك، ولا تُسلَّم الطلبية إلا بعد سداد باقي قيمتها.</span></div><div class="qti"><span class="qn">7</span><span>لتأكيد الطلب راسلنا على واتساب مع ذكر رقم العرض: ${esc(ADM.no)}.</span></div></div>` : ''}
     <div class="qfoot">صفحة ${pn} من ${pc}</div></div>`;
-  const all = rows.map((r, i) => ({ r, i })), per1 = 7, per = 9, parts = [all.slice(0, per1)];
-  for (let i = per1; i < all.length; i += per) parts.push(all.slice(i, i + per));
-  if (parts[parts.length - 1].length > (parts.length === 1 ? 4 : 5)) parts.push([]);
+  const all = rows.map((r, i) => ({ r, i })), parts = [];
+  if (all.length <= 4) parts.push(all);
+  else {
+    const lastN = Math.min(5, all.length - 1), rest = all.slice(0, all.length - lastN);
+    parts.push(rest.slice(0, 7)); for (let i = 7; i < rest.length; i += 9) parts.push(rest.slice(i, i + 9));
+    parts.push(all.slice(all.length - lastN));
+  }
   $('#qdoc').innerHTML = parts.map((p, k) => page(p, k === 0, k === parts.length - 1, k + 1, parts.length)).join('');
   toast('جارٍ إنشاء الملف…');
   const { jsPDF } = window.jspdf, pdf = new jsPDF({ unit: 'mm', format: 'a4' });
