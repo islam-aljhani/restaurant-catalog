@@ -234,3 +234,5 @@ body.has-sbar .toast{bottom:84px}
 .qti{display:flex;gap:8px;align-items:flex-start;margin:3px 0}.qn{flex:none;width:20px;height:20px;border-radius:50%;background:#b8913a;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:3px}
 .qna{color:#c0392b;font-weight:700}
 .qt tfoot td,.qt td:nth-child(6),.qt td:nth-child(7){white-space:nowrap}
+.lborig{font-size:13px;color:var(--accent);margin-top:4px;font-weight:700}
+.qorig{color:#b8913a;font-size:11px}

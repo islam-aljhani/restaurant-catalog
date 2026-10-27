@@ -85,7 +85,8 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 const toast = m => { const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 2400); };
 let KEY = ''; try { KEY = localStorage.getItem('adminKey') || ''; } catch (e) {}
 let ORD = [], ORIG = {}, ADM = null, PROD = {}, GAL = {}, PRICES = [];
-fetch('data/products.json').then(r => r.json()).then(d => d.products.forEach(p => PROD[p.id] = p)).catch(() => {});
+let ORIGINS = {};
+fetch('data/products.json').then(r => r.json()).then(d => { ORIGINS = d.origins || {}; d.products.forEach(p => PROD[p.id] = p); }).catch(() => {});
 fetch('data/gal.json').then(r => r.json()).then(g => GAL = g).catch(() => {});
 const thumb = id => { const p = PROD[id]; let g = p && p.h && GAL[p.h]; if (typeof g === 'string') return `thumb/x/${g.split(':')[0]}-1.jpg`; return g ? `thumb/x/${p.h}-1.jpg` : `thumb/${id}.jpg`; };
 const STEPS = [['sent','أُرسل للمورّد'],['priced','وصلت أسعار المورّد'],['replied','تم الرد على الزبون'],['done','تم البيع'],['cancel','ملغي']];
@@ -277,7 +278,7 @@ $('#qPdf').onclick = async () => {
     ${first ? `<div class="qhead"><div><div class="qbrand">${esc(S.name)}</div><div class="qsub">عرض سعر</div></div>
       <div class="qinfo"><div>رقم العرض: <b>${esc(ADM.no)}</b></div><div>التاريخ: ${d(today)}</div><div>صالح حتى: ${d(until)}</div><div>الزبون: <b>${esc(ADM.r || ADM.c || '-')}</b></div></div></div>` : `<div class="qhead small"><b>${esc(S.name)}</b> — عرض سعر ${esc(ADM.no)}</div>`}
     ${part.length || !last ? '' : `<div class="qtotbox">إجمالي العرض: <b>${money(tot)} د.ل</b> (${ADM.lines.length} صنف)</div>`}<table class="qt" ${part.length ? '' : 'style="display:none"'}><thead><tr><th>#</th><th>الصورة</th><th>الصنف</th><th>المقاس</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead><tbody>
-    ${part.map(({ r, i }) => `<tr><td>${i + 1}</td><td>${imgs[i] ? `<img src="${imgs[i]}">` : ''}</td><td><b>${esc(r.l.ar)}</b><br><small>${esc(r.l.id)}</small></td><td>${esc(r.l.size)}</td><td>${r.l.q}</td>
+    ${part.map(({ r, i }) => `<tr><td>${i + 1}</td><td>${imgs[i] ? `<img src="${imgs[i]}">` : ''}</td><td><b>${esc(r.l.ar)}</b><br><small>${esc(r.l.id)}</small>${PROD[r.l.id] && ORIGINS[PROD[r.l.id].o] ? `<br><span class="qorig">${esc(ORIGINS[PROD[r.l.id].o])}</span>` : ''}</td><td>${esc(r.l.size)}</td><td>${r.l.q}</td>
       <td>${r.na ? '<span class="qna">غير متوفر حالياً</span>' : r.s == null ? 'يُحدَّد لاحقاً' : money(r.s) + ' د.ل'}</td><td>${r.t == null ? '-' : money(r.t) + ' د.ل'}</td></tr>`).join('')}
     </tbody>${last ? `<tfoot><tr><td colspan="6">الإجمالي</td><td>${money(tot)} د.ل</td></tr></tfoot>` : ''}</table>
     ${last ? `<div class="qterms"><div class="qth">الشروط والملاحظات</div><div class="qti"><span class="qn">1</span><span>الأسعار بالدينار الليبي وتشمل الشحن.</span></div><div class="qti"><span class="qn">2</span><span>هذا العرض صالح لمدة ${+$('#qDays').value || 7} أيام، حتى تاريخ ${d(until)}.</span></div><div class="qti"><span class="qn">3</span><span>عند الموافقة على العرض يُدفع عربون لا يقل عن ${dep}% من قيمة الطلبية (${money(Math.ceil(tot * dep / 100))} د.ل على الأقل).</span></div><div class="qti"><span class="qn">4</span><span>يمكن الدفع بجميع الطرق: نقداً (كاش) أو عن طريق المصرف.</span></div><div class="qti"><span class="qn">5</span><span>يبدأ تجهيز الطلبية بعد استلام العربون.</span></div><div class="qti"><span class="qn">6</span><span>عند تجهيز الطلبية بالكامل نبلغكم بذلك، ولا تُسلَّم الطلبية إلا بعد سداد باقي قيمتها.</span></div><div class="qti"><span class="qn">7</span><span>لتأكيد الطلب راسلنا على واتساب مع ذكر رقم العرض: ${esc(ADM.no)}.</span></div></div>` : ''}

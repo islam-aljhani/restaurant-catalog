@@ -56,7 +56,7 @@
     <div class="lbimg" id="lbimg"><img id="lbpic" alt=""></div>
     <div class="lbthumbs" id="lbthumbs"></div>
     <div class="lbinfo">
-      <div class="nm" id="lbnm"></div><div class="code" id="lbcode"></div>
+      <div class="nm" id="lbnm"></div><div class="code" id="lbcode"></div><div class="lborig" id="lborig"></div>
       <div id="lbsize"></div>
       <div class="row">
         <div class="qty"><button data-d="1">+</button><input id="lbq" value="1" inputmode="numeric"><button data-d="-1">−</button></div>
@@ -252,6 +252,7 @@ function openLB(id) {
     $('#lbthumbs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); });
   $('#lbnm').textContent = p.ar;
   $('#lbcode').textContent = `رقم الصنف: ${p.id}` + (p.s ? ` · تشكيلة ${p.s}` : '');
+  $('#lborig').textContent = (DATA.origins || {})[p.o] || '';
   $('#lbsize').innerHTML = p.v.length > 1 ? `<select id="lbv">${p.v.map((v, i) => `<option value="${i}">${esc(v.ar)}</option>`).join('')}</select>` : `<div class="code">المقاس: ${esc(p.v[0].ar)}</div>`;
   $('#lbq').value = 1; $('#lbimg').classList.remove('z'); if (!$('#lb').classList.contains('open')) pushLayer('lb'); $('#lb').classList.add('open'); document.body.style.overflow = 'hidden';
 }
