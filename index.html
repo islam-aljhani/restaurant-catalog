@@ -89,7 +89,7 @@ const FB = `onerror="if(!this.dataset.f){this.dataset.f=1;this.src=this.dataset.
 Promise.all([fetch('data/products.json').then(r => r.json()), fetch('data/gal.json').then(r => r.ok ? r.json() : {}).catch(() => ({}))]).then(([d, g]) => { GAL = g || {};
   DATA = d; d.products.forEach(p => P[p.id] = p);
   cart = cart.filter(x => P[x.id] && P[x.id].v[x.v]);
-  const ss = [...new Set(d.products.map(p => p.s))].sort((a, b) => a - b);
+  const ss = [...new Set(d.products.map(p => p.s).filter(Boolean))].sort((a, b) => a - b);
   $('#series').insertAdjacentHTML('beforeend', ss.map(s => `<option value="${s}">تشكيلة ${s}</option>`).join(''));
   renderTiles(); route(); renderCart();
 });
@@ -131,7 +131,7 @@ function card(p) {
     <div class="ph" data-id="${p.id}" title="اضغط للتكبير"><img src="${thumbOf(p)}" data-fb="thumb/${p.id}.jpg" ${FB} alt="${esc(p.ar)}" loading="lazy">${nImg(p) > 1 ? `<span class="nv">${nImg(p)} صور</span>` : ''}<span class="zm">⤢</span></div>
     <div class="cb">
       <div class="nm">${esc(p.ar)}</div>
-      <div class="code">رقم الصنف: ${p.id}<span class="series">تشكيلة ${p.s}</span></div>
+      <div class="code">رقم الصنف: ${p.id}${p.s ? `<span class="series">تشكيلة ${p.s}</span>` : ''}</div>
       ${p.v.length > 1 ? `<select>${p.v.map((v, i) => `<option value="${i}">${esc(v.ar)}</option>`).join('')}</select>` : `<div class="code">المقاس: ${esc(p.v[0].ar)}</div>`}
       <div class="row">
         <div class="qty"><button data-d="1">+</button><input value="1" inputmode="numeric"><button data-d="-1">−</button></div>
@@ -238,7 +238,7 @@ function openLB(id) {
   $('#lbthumbs').querySelectorAll('button').forEach(b => b.onclick = e => { e.stopPropagation(); pic.dataset.f = ''; pic.src = big(b.dataset.i); $('#lbimg').classList.remove('z');
     $('#lbthumbs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); });
   $('#lbnm').textContent = p.ar;
-  $('#lbcode').textContent = `رقم الصنف: ${p.id} · تشكيلة ${p.s}`;
+  $('#lbcode').textContent = `رقم الصنف: ${p.id}` + (p.s ? ` · تشكيلة ${p.s}` : '');
   $('#lbsize').innerHTML = p.v.length > 1 ? `<select id="lbv">${p.v.map((v, i) => `<option value="${i}">${esc(v.ar)}</option>`).join('')}</select>` : `<div class="code">المقاس: ${esc(p.v[0].ar)}</div>`;
   $('#lbq').value = 1; $('#lbimg').classList.remove('z'); $('#lb').classList.add('open'); document.body.style.overflow = 'hidden';
 }
