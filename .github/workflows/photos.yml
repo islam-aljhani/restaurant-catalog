@@ -1,7 +1,7 @@
 name: Sync product photos
 on:
   push:
-    paths: ['tools/want.txt', 'tools/fetch_photos.py']
+    paths: ['tools/want.txt', 'tools/fetch_photos.py', 'tools/want_pioli.txt', 'tools/fetch_pioli.py']
   workflow_dispatch:
 permissions:
   contents: write
@@ -16,10 +16,11 @@ jobs:
         with: { python-version: '3.12' }
       - run: pip install pillow
       - run: python tools/fetch_photos.py || true
+      - run: python tools/fetch_pioli.py || true
       - name: Commit photos
         run: |
           git config user.name "photo-sync"
           git config user.email "actions@users.noreply.github.com"
-          mkdir -p img/x thumb/x && git add -A img/x thumb/x data/gal.json tools/last_run.log
+          mkdir -p img/x thumb/x && git add -A img/x thumb/x data/gal.json tools/last_run.log tools/last_run_pioli.log
           git diff --cached --quiet || git commit -m "Sync product photos"
           git pull --rebase -q && git push
