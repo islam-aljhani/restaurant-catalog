@@ -42,6 +42,8 @@
       </table></div>
       <div class="sh">حالة الطلب</div><div class="steps" id="steps"></div>
       <div class="acts">
+        <label class="curpick">عملة الأسعار المطلوبة من المورّد
+          <select id="reqCur"><option value="TRY">ليرة تركية (TRY)</option><option value="USD">دولار أمريكي (USD)</option><option value="EUR">يورو (EUR)</option><option value="CNY">يوان صيني (CNY)</option></select></label>
         <button class="xl" id="dlXl">١. تحميل ملف الإكسل للمورّد</button>
         <button class="wa" id="waAyse">٢. افتح محادثة المورّد</button>
       </div>
@@ -152,24 +154,31 @@ async function imgB64(src) {
   return new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(b); });
 }
 const dims = src => new Promise(r => { const i = new Image(); i.onload = () => r([i.naturalWidth, i.naturalHeight]); i.src = src; });
+try { const c = localStorage.getItem('reqCur'); if (c) $('#reqCur').value = c; } catch (e) {}
+$('#reqCur').onchange = () => { try { localStorage.setItem('reqCur', $('#reqCur').value); } catch (e) {} };
+const CURN = { TRY: 'Turkish Lira (TRY)', USD: 'US Dollar (USD)', EUR: 'Euro (EUR)', CNY: 'Chinese Yuan (CNY)' };
 $('#dlXl').onclick = async () => {
+  const RC = $('#reqCur').value;
   const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Request', { views: [{ showGridLines: false, state: 'frozen', ySplit: 6 }], pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
-  [5, 14, 18, 30, 46, 7, 12, 13].forEach((w, i) => ws.getColumn(i + 1).width = w);
+  [5, 14, 18, 30, 46, 7, 17, 17].forEach((w, i) => ws.getColumn(i + 1).width = w);
   const yellow = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } }, bd = { style: 'thin', color: { argb: 'FFBFBFBF' } }, B = { top: bd, left: bd, bottom: bd, right: bd };
   ws.getCell('A1').value = 'Price Request'; ws.getCell('A1').font = { size: 16, bold: true, color: { argb: 'FF1F3A5F' } };
   ws.getCell('A2').value = `To: ${S.supplier.name} — ${S.supplier.city}`;
   ws.getCell('A3').value = `Request No.: ${ADM.no}`; ws.getCell('E3').value = 'Date: ' + new Date().toISOString().slice(0, 10);
-  ws.getCell('A4').value = 'Please fill in the yellow Unit Cost cells and send the file back. Currency:';
+  ws.getCell('A4').value = `Please fill in the yellow Unit Cost cells in ${CURN[RC]} and send the file back. Currency:`; ws.getCell('A4').font = { bold: true };
+  ws.getCell('F4').value = RC; ws.getCell('F4').font = { bold: true, size: 12, color: { argb: 'FFC00000' } }; ws.getCell('F4').alignment = { horizontal: 'center' };
+  ws.getCell('F4').dataValidation = { type: 'list', allowBlank: false, formulae: ['"TRY,USD,EUR,CNY"'] };
   ws.getCell('F4').fill = yellow; ws.getCell('F4').border = B;
+  ws.getCell('A5').value = `Lütfen birim fiyatları ${RC} olarak yazınız.`; ws.getCell('A5').font = { italic: true, color: { argb: 'FF666666' } };
   const hr = ws.getRow(6);
-  ['#', 'Image', 'Model No.', 'Catalog / Page', 'Description', 'Qty', 'Unit Cost', 'Total'].forEach((h, i) => { const c = hr.getCell(i + 1); c.value = h;
+  ['#', 'Image', 'Model No.', 'Catalog / Page', 'Description', 'Qty', `Unit Cost (${RC})`, `Total (${RC})`].forEach((h, i) => { const c = hr.getCell(i + 1); c.value = h;
     c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3A5F' } }; c.alignment = { horizontal: 'center', vertical: 'middle' }; c.border = B; });
   hr.height = 22; let r = 7;
   for (const [i, l] of ADM.lines.entries()) {
     const g = orig(l.vid), row = ws.getRow(r);
     [i + 1, '', g.code || '', `${g.catalog || ''}${g.collection ? ' — ' + g.collection : ''} / p.${g.page || ''}`, `${g.description || ''}${g.spec ? ' — ' + g.spec : ''}`, l.q, null, { formula: `F${r}*G${r}` }]
       .forEach((val, j) => { const c = row.getCell(j + 1); c.value = val; c.border = B; c.alignment = { vertical: 'middle', horizontal: j === 4 || j === 3 ? 'left' : 'center', wrapText: true }; });
-    row.getCell(7).fill = yellow; row.getCell(7).numFmt = row.getCell(8).numFmt = '#,##0.00'; row.height = 68;
+    row.getCell(7).fill = yellow; row.getCell(7).numFmt = row.getCell(8).numFmt = `#,##0.00 "${RC}"`; row.height = 68;
     try {
       const src = await imgB64(thumb(l.id)); let [w, h] = await dims(src); const k = Math.min(86 / w, 82 / h); w = Math.round(w * k); h = Math.round(h * k);
       ws.addImage(wb.addImage({ base64: src, extension: 'jpeg' }), { tl: { col: 1 + ((98 - w) / 2) / 98, row: r - 1 + ((90 - h) / 2) / 90 }, ext: { width: w, height: h } });
@@ -177,14 +186,14 @@ $('#dlXl').onclick = async () => {
     r++;
   }
   ws.getCell(`G${r}`).value = 'Total'; ws.getCell(`G${r}`).font = { bold: true };
-  const t = ws.getCell(`H${r}`); t.value = { formula: `SUM(H7:H${r - 1})` }; t.font = { bold: true }; t.numFmt = '#,##0.00'; t.border = B;
+  const t = ws.getCell(`H${r}`); t.value = { formula: `SUM(H7:H${r - 1})` }; t.font = { bold: true }; t.numFmt = `#,##0.00 "${RC}"`; t.border = B;
   const buf = await wb.xlsx.writeBuffer();
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
   a.download = `Price_Request_${ADM.no}.xlsx`; a.click(); toast('تم تحميل ملف الإكسل');
 };
 $('#waAyse').onclick = () => {
   if (!ADM.st || !ADM.st.sent) setStep(ADM, 'sent', true);
-  const msg = `Merhaba ${S.supplier.name} Hanım,\nFiyat talebi ${ADM.no} ekteki Excel dosyasındadır (${ADM.lines.length} kalem). Sarı hücrelere birim fiyatları yazıp geri gönderebilir misiniz?\nTeşekkürler.`;
+  const msg = `Merhaba ${S.supplier.name} Hanım,\nFiyat talebi ${ADM.no} ekteki Excel dosyasındadır (${ADM.lines.length} kalem). Sarı hücrelere birim fiyatları ${$('#reqCur').value} olarak yazıp geri gönderebilir misiniz?\nTeşekkürler.`;
   window.open(`https://wa.me/${S.supplier.whatsApp}?text=${encodeURIComponent(msg)}`, '_blank');
 };
 
@@ -244,7 +253,7 @@ $('#upXl').onchange = async e => {
   try {
     const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await f.arrayBuffer()); const ws = wb.worksheets[0];
     const no = String(ws.getCell('A3').value || ''); if (no && !no.includes(ADM.no)) { if (!confirm('هذا الملف لطلب آخر (' + no + '). هل تكمل؟')) return; }
-    let hdr = 6; ws.eachRow((row, r) => { if (String(row.getCell(7).value || '').trim() === 'Unit Cost') hdr = r; });
+    let hdr = 6; ws.eachRow((row, r) => { if (String(row.getCell(7).value || '').trim().startsWith('Unit Cost')) hdr = r; });
     const cost = ADM.lines.map((l, i) => num(ws.getRow(hdr + 1 + i).getCell(7).value));
     const cur = String(ws.getCell('F4').value || '').trim();
     saveQ(ADM.no, { cost, cur: cur || $('#qCur').value, manual: {} });

@@ -224,3 +224,5 @@ body.has-sbar .toast{bottom:84px}
 .hist{font-size:12px;line-height:1.6;min-width:150px}.hist .mut{opacity:.6}
 .up{color:#e74c3c;font-weight:700}.dn{color:#27ae60;font-weight:700}.eq{opacity:.7}
 .qsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin:12px 0;padding:12px;border-radius:10px;background:rgba(184,145,58,.12)}
+
+.curpick{display:flex;flex-direction:column;gap:4px;font-size:13px}.curpick select{padding:9px 10px;border-radius:10px;font:inherit}
