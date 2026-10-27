@@ -1,5 +1,8 @@
 """Fetch product photos listed (as hashes) in tools/want.txt, resize, save to img/x and thumb/x."""
-import hashlib, io, json, os, re, sys, time, urllib.request
+import hashlib, io, json, os, re, sys, time, urllib.request, builtins
+LOG = open("tools/last_run.log", "w")
+def print(*a):
+    builtins.print(*a); LOG.write(" ".join(map(str, a)) + "\n"); LOG.flush()
 from PIL import Image
 
 H = lambda s: hashlib.sha1(s.encode()).hexdigest()[:12]
@@ -16,7 +19,11 @@ want = set(l.strip() for l in open('tools/want.txt') if l.strip())
 os.makedirs('img/x', exist_ok=True); os.makedirs('thumb/x', exist_ok=True)
 gal_path = 'data/gal.json'
 gal = json.load(open(gal_path)) if os.path.exists(gal_path) else {}
-sm = get('https://www.idfine.com.tr/sitemap.xml').decode('utf-8', 'ignore')
+try:
+    sm = get('https://www.idfine.com.tr/sitemap.xml').decode('utf-8', 'ignore')
+except Exception as e:
+    print('sitemap fail', repr(e)); sm = ''
+print('sitemap chars', len(sm))
 skus = re.findall(r'<loc>https://www\.idfine\.com\.tr/urun/([^<]+)</loc>', sm)
 todo = [s for s in skus if H(s) in want and H(s) not in gal]
 print('to fetch', len(todo))
@@ -25,13 +32,14 @@ for n, sku in enumerate(todo, 1):
     try:
         page = get(f'https://www.idfine.com.tr/urun/{sku}').decode('utf-8', 'ignore')
     except Exception as e:
-        print(n, 'page fail', e); continue
+        print(n, 'page fail', repr(e)); continue
     med = re.findall(r'https://cdn\.idfine\.com\.tr/products/\d+/[^"\'\s)]+?_medium\.webp', page)
     urls = []
     for m in med:
         u = m.replace('_medium.webp', '.webp')
         if u not in urls: urls.append(u)
     urls = urls[:5]
+    if not urls: print(n, 'no gallery urls, page chars', len(page), page[:200].replace('\n',' '))
     k = 0
     for u in urls:
         try:
