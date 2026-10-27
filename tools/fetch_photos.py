@@ -3,7 +3,15 @@ import hashlib, io, json, os, re, sys, time, urllib.request, builtins
 LOG = open("tools/last_run.log", "w")
 def print(*a):
     builtins.print(*a); LOG.write(" ".join(map(str, a)) + "\n"); LOG.flush()
-from PIL import Image
+from PIL import Image, ImageChops
+
+def trim(im):
+    bg = Image.new('RGB', im.size, im.getpixel((2, 2)))
+    diff = ImageChops.difference(im, bg).convert('L').point(lambda v: 255 if v > 18 else 0)
+    box = diff.getbbox()
+    if not box: return im
+    w, h = box[2] - box[0], box[3] - box[1]; pad = int(max(w, h) * 0.05)
+    return im.crop((max(0, box[0] - pad), max(0, box[1] - pad), min(im.width, box[2] + pad), min(im.height, box[3] + pad)))
 
 H = lambda s: hashlib.sha1(s.encode()).hexdigest()[:12]
 UA = {'User-Agent': 'Mozilla/5.0 (catalog image sync)'}
@@ -19,6 +27,7 @@ want = set(l.strip() for l in open('tools/want.txt') if l.strip())
 os.makedirs('img/x', exist_ok=True); os.makedirs('thumb/x', exist_ok=True)
 gal_path = 'data/gal.json'
 gal = json.load(open(gal_path)) if os.path.exists(gal_path) else {}
+if os.path.exists('tools/redo'): gal = {}
 try:
     sm = get('https://www.idfine.com.tr/sitemap.xml').decode('utf-8', 'ignore')
 except Exception as e:
@@ -53,7 +62,7 @@ for n, sku in enumerate(todo, 1):
     k = 0
     for u in urls:
         try:
-            im = Image.open(io.BytesIO(get(u))).convert('RGB')
+            im = trim(Image.open(io.BytesIO(get(u))).convert('RGB'))
         except Exception as e:
             print(n, 'img fail', e); continue
         k += 1
