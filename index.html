@@ -214,9 +214,10 @@ $('#send').onclick = async () => {
       const j = await res.json(); no = j.no || '';
     } catch (e) {}
   }
-  if (!no) no = localNo();
-  const txt = lines.map((l, i) => `${i + 1}) ${l.ar}\n   رقم الصنف: ${l.id} — المقاس: ${l.size} — الكمية: ${l.q}`).join('\n');
-  const msg = `طلب عرض سعر\nرقم الطلب: ${no}\nالمطعم / الاسم: ${f.rname}\n\nالأصناف:\n${txt}`;
+  const saved = !!no; if (!no) no = localNo();
+  const pcs = lines.reduce((a, l) => a + l.q, 0);
+  let msg = `طلب عرض سعر\nرقم الطلب: ${no}\nالمطعم / الاسم: ${f.rname}\nعدد الأصناف: ${lines.length}\nإجمالي القطع: ${pcs}`;
+  if (!saved) msg += '\n\nالأصناف:\n' + lines.map((l, i) => `${i + 1}) ${l.id} ${l.ar} — ${l.size} × ${l.q}`).join('\n');
   cart = []; saveCart(); renderCart(); setC(false); if (layer() === 'cart') history.replaceState(null, '', location.href);
   btn.textContent = 'أرسل الطلب عبر واتساب';
   location.href = `https://wa.me/${S.ownerWhatsApp}?text=${encodeURIComponent(msg)}`;
