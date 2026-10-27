@@ -1,0 +1,31 @@
+name: Sync store photos (ALKAN, BIRADLI)
+on:
+  push:
+    branches: [main]
+    paths: ['tools/want_store.txt', 'tools/fetch_store.py']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: photos
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install pillow
+      - run: python tools/fetch_store.py x data/gal.json || true
+      - name: Commit photos
+        run: |
+          git config user.name "photo-sync"
+          git config user.email "actions@users.noreply.github.com"
+          mkdir -p img/x thumb/x
+          git fetch -q origin main
+          git show origin/main:data/gal.json > /tmp/gal_main.json 2>/dev/null || echo '{}' > /tmp/gal_main.json
+          python -c "import json;a=json.load(open('/tmp/gal_main.json'));b=json.load(open('data/gal.json'));a.update(b);json.dump(a,open('data/gal.json','w'),separators=(',',':'))"
+          git reset -q origin/main
+          git add -A img/x thumb/x data/gal.json tools/last_run_store.log
+          git diff --cached --quiet || git commit -m "Sync store photos"
+          git push
