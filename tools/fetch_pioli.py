@@ -32,31 +32,34 @@ for m in maps:
     try: urls += [u for u in re.findall(r'<loc>([^<]+)</loc>', get(m).decode('utf-8', 'ignore')) if '/product/' in u]
     except Exception as e: print('map fail', m, repr(e))
 print('product pages', len(urls))
+from concurrent.futures import ThreadPoolExecutor
+def page(u):
+    try: return u, get(u).decode('utf-8', 'ignore')
+    except Exception as e: return u, None
 done = 0
-for n, u in enumerate(urls, 1):
-    try: pg = get(u).decode('utf-8', 'ignore')
-    except Exception as e: print(n, 'page fail', repr(e)); continue
-    code = re.search(r'Article Code\s*:\s*([A-Z0-9]+)', pg)
-    if not code: continue
-    cats = [norm(c) for c in re.findall(r'/product-category/[^"]+"[^>]*rel="tag">([^<]+)</a>', pg)]
-    keys = [hs(c + '|' + code.group(1)) for c in cats]
-    keys = [k for k in keys if k in want and k not in gal]
-    if not keys: continue
-    imgs = []
-    for x in re.findall(r'data-large_image="([^"]+)"', pg):
-        if x not in imgs: imgs.append(x)
-    k = 0
-    for x in imgs[:5]:
-        try: im = trim(Image.open(io.BytesIO(get(x))).convert('RGB'))
-        except Exception as e: print(n, 'img fail', repr(e)); continue
-        k += 1
-        b = im.copy(); b.thumbnail((1000, 1000), Image.LANCZOS); b.save(f'img/x/{keys[0]}-{k}.jpg', quality=84, optimize=True, progressive=True)
-        t = im.copy(); t.thumbnail((420, 420), Image.LANCZOS); t.save(f'thumb/x/{keys[0]}-{k}.jpg', quality=80, optimize=True, progressive=True)
-    if k:
-        for kk in keys:
-            gal[kk] = k if kk == keys[0] else keys[0] + ':' + str(k)
-        done += 1
-    print(n, code.group(1), cats[:2], k)
-    time.sleep(0.4)
+with ThreadPoolExecutor(8) as ex:
+    for n, (u, pg) in enumerate(ex.map(page, urls), 1):
+        if pg is None: print(n, 'page fail', u); continue
+        code = re.search(r'Article Code\s*:\s*([A-Z0-9]+)', pg)
+        if not code: continue
+        cats = [norm(c) for c in re.findall(r'/product-category/[^"]+"[^>]*rel="tag">([^<]+)</a>', pg)]
+        keys = [hs(c + '|' + code.group(1)) for c in cats]
+        keys = [k for k in keys if k in want and k not in gal]
+        if not keys: continue
+        imgs = []
+        for x in re.findall(r'data-large_image="([^"]+)"', pg):
+            if x not in imgs: imgs.append(x)
+        k = 0
+        for x in imgs[:5]:
+            try: im = trim(Image.open(io.BytesIO(get(x))).convert('RGB'))
+            except Exception as e: print(n, 'img fail', repr(e)); continue
+            k += 1
+            b = im.copy(); b.thumbnail((1000, 1000), Image.LANCZOS); b.save(f'img/x/{keys[0]}-{k}.jpg', quality=84, optimize=True, progressive=True)
+            t = im.copy(); t.thumbnail((420, 420), Image.LANCZOS); t.save(f'thumb/x/{keys[0]}-{k}.jpg', quality=80, optimize=True, progressive=True)
+        if k:
+            for kk in keys:
+                gal[kk] = k if kk == keys[0] else keys[0] + ':' + str(k)
+            done += 1
+        print(n, code.group(1), cats[:2], k)
 json.dump(gal, open('data/gal.json', 'w'), separators=(',', ':'))
 print('done', done, len(gal))
