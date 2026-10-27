@@ -1,0 +1,23 @@
+name: Store photo sample
+on:
+  push:
+    branches: [samples]
+    paths: ['tools/want_store.txt', 'tools/fetch_store.py']
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install pillow
+      - run: python tools/fetch_store.py s data/gal_sample.json || true
+      - run: |
+          git config user.name "photo-sync"; git config user.email "actions@users.noreply.github.com"
+          mkdir -p img/s thumb/s
+          git add -A img/s thumb/s data/gal_sample.json tools/last_run_store.log
+          git diff --cached --quiet || git commit -m "Store photo sample"
+          git push
