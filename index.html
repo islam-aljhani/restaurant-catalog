@@ -54,6 +54,7 @@
   <div class="lbbox">
     <button class="lbx" id="lbx" aria-label="إغلاق">×</button>
     <div class="lbimg" id="lbimg"><img id="lbpic" alt=""></div>
+    <div class="lbthumbs" id="lbthumbs"></div>
     <div class="lbinfo">
       <div class="nm" id="lbnm"></div><div class="code" id="lbcode"></div>
       <div id="lbsize"></div>
@@ -79,7 +80,11 @@ const PAGE = 48;
 let cart = []; try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch (e) {}
 const saveCart = () => { try { localStorage.setItem('cart', JSON.stringify(cart)); } catch (e) {} };
 
-fetch('data/products.json').then(r => r.json()).then(d => {
+let GAL = {};
+const nImg = p => (p.h && GAL[p.h]) || 0;
+const thumbOf = p => nImg(p) ? `thumb/x/${p.h}-1.jpg` : `thumb/${p.id}.jpg`;
+const FB = `onerror="if(!this.dataset.f){this.dataset.f=1;this.src=this.dataset.fb}"`;
+Promise.all([fetch('data/products.json').then(r => r.json()), fetch('data/gal.json').then(r => r.ok ? r.json() : {}).catch(() => ({}))]).then(([d, g]) => { GAL = g || {};
   DATA = d; d.products.forEach(p => P[p.id] = p);
   cart = cart.filter(x => P[x.id] && P[x.id].v[x.v]);
   const ss = [...new Set(d.products.map(p => p.s))].sort((a, b) => a - b);
@@ -121,7 +126,7 @@ function apply() {
 }
 function card(p) {
   return `<div class="card">
-    <div class="ph" data-id="${p.id}" title="اضغط للتكبير"><img src="thumb/${p.id}.jpg" alt="${esc(p.ar)}" loading="lazy"><span class="zm">⤢</span></div>
+    <div class="ph" data-id="${p.id}" title="اضغط للتكبير"><img src="${thumbOf(p)}" data-fb="thumb/${p.id}.jpg" ${FB} alt="${esc(p.ar)}" loading="lazy">${nImg(p) > 1 ? `<span class="nv">${nImg(p)} صور</span>` : ''}<span class="zm">⤢</span></div>
     <div class="cb">
       <div class="nm">${esc(p.ar)}</div>
       <div class="code">رقم الصنف: ${p.id}<span class="series">تشكيلة ${p.s}</span></div>
@@ -165,7 +170,7 @@ $('#series').onchange = apply;
 function renderCart() {
   $('#cnt').textContent = $('#hcnt').textContent = cart.reduce((a, x) => a + x.q, 0);
   $('#items').innerHTML = cart.length ? cart.map((x, i) => { const p = P[x.id], v = p.v[x.v];
-    return `<div class="it"><img src="thumb/${p.id}.jpg" alt=""><div class="t">${esc(p.ar)}<small>${p.id} · ${esc(v.ar)}</small></div>
+    return `<div class="it"><img src="${thumbOf(p)}" data-fb="thumb/${p.id}.jpg" ${FB} alt=""><div class="t">${esc(p.ar)}<small>${p.id} · ${esc(v.ar)}</small></div>
     <div class="qty"><button data-i="${i}" data-d="1">+</button><input value="${x.q}" data-i="${i}"><button data-i="${i}" data-d="-1">−</button></div>
     <button class="x" data-i="${i}" aria-label="حذف">🗑</button></div>`; }).join('') : '<div class="empty">لم تضف أي صنف بعد</div>';
   $('#items').querySelectorAll('.qty button').forEach(b => b.onclick = () => { const x = cart[b.dataset.i]; x.q = Math.max(1, x.q + (+b.dataset.d)); saveCart(); renderCart(); });
@@ -224,7 +229,13 @@ document.addEventListener('click', e => { const b = e.target.closest('.share'); 
 /* lightbox */
 let LB = null;
 function openLB(id) {
-  const p = P[id]; LB = p; $('#lbpic').src = `img/${p.id}.jpg`; $('#lbnm').textContent = p.ar;
+  const p = P[id]; LB = p; const k = nImg(p);
+  const big = i => k ? `img/x/${p.h}-${i}.jpg` : `img/${p.id}.jpg`;
+  const pic = $('#lbpic'); pic.dataset.f = ''; pic.dataset.fb = `img/${p.id}.jpg`; pic.setAttribute('onerror', 'if(!this.dataset.f){this.dataset.f=1;this.src=this.dataset.fb}'); pic.src = big(1);
+  $('#lbthumbs').innerHTML = k > 1 ? Array.from({ length: k }, (_, i) => `<button class="${i ? '' : 'on'}" data-i="${i + 1}"><img src="thumb/x/${p.h}-${i + 1}.jpg" alt=""></button>`).join('') : '';
+  $('#lbthumbs').querySelectorAll('button').forEach(b => b.onclick = e => { e.stopPropagation(); pic.dataset.f = ''; pic.src = big(b.dataset.i); $('#lbimg').classList.remove('z');
+    $('#lbthumbs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); });
+  $('#lbnm').textContent = p.ar;
   $('#lbcode').textContent = `رقم الصنف: ${p.id} · تشكيلة ${p.s}`;
   $('#lbsize').innerHTML = p.v.length > 1 ? `<select id="lbv">${p.v.map((v, i) => `<option value="${i}">${esc(v.ar)}</option>`).join('')}</select>` : `<div class="code">المقاس: ${esc(p.v[0].ar)}</div>`;
   $('#lbq').value = 1; $('#lbimg').classList.remove('z'); $('#lb').classList.add('open'); document.body.style.overflow = 'hidden';
