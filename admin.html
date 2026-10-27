@@ -60,6 +60,7 @@
           <label>نسبة الربح % <input id="qMar" type="number" step="1" value="30"></label>
           <label>التقريب إلى (دينار) <input id="qRnd" type="number" step="0.5" value="1"></label>
           <label>صلاحية العرض (أيام) <input id="qDays" type="number" step="1" value="7"></label>
+          <label>العربون % <input id="qDep" type="number" step="5" value="50"></label>
         </div>
         <div class="tw"><table>
           <thead><tr><th>#</th><th>الصنف</th><th>الكمية</th><th>تكلفة المورّد</th><th>آخر مرة</th><th>سعر البيع للوحدة (د.ل)</th><th>الإجمالي (د.ل)</th></tr></thead>
@@ -199,7 +200,7 @@ $('#waAyse').onclick = () => {
 
 // ---------- quote: supplier prices -> customer PDF ----------
 const QK = no => 'quote:' + no;
-const qset = ['qCur', 'qRate', 'qShip', 'qMar', 'qRnd', 'qDays'];
+const qset = ['qCur', 'qRate', 'qShip', 'qMar', 'qRnd', 'qDays', 'qDep'];
 try { const d = JSON.parse(localStorage.getItem('quoteDefaults') || '{}'); qset.forEach(k => { if (d[k] != null) $('#' + k).value = d[k]; }); } catch (e) {}
 const loadQ = no => { try { return JSON.parse(localStorage.getItem(QK(no)) || 'null'); } catch (e) { return null; } };
 const saveQ = (no, q) => { try { localStorage.setItem(QK(no), JSON.stringify(q)); } catch (e) {} };
@@ -266,20 +267,21 @@ $('#qPdf').onclick = async () => {
   const q = loadQ(ADM.no); if (!q) return;
   const rows = ADM.lines.map((l, i) => { const s = q.manual && q.manual[i] != null ? q.manual[i] : sellOf(q.cost[i]); return { l, s, t: s == null ? null : s * l.q }; });
   if (rows.some(r => r.s == null) && !confirm('بعض الأصناف بلا سعر. ستظهر «يُحدَّد لاحقاً». هل تكمل؟')) return;
-  const tot = rows.reduce((a, r) => a + (r.t || 0), 0), today = new Date(), until = new Date(Date.now() + (+$('#qDays').value || 7) * 864e5);
+  const dep = +$('#qDep').value || 50, tot = rows.reduce((a, r) => a + (r.t || 0), 0), today = new Date(), until = new Date(Date.now() + (+$('#qDays').value || 7) * 864e5);
   const d = x => x.toLocaleDateString('ar-LY', { year: 'numeric', month: '2-digit', day: '2-digit' });
   const imgs = await Promise.all(rows.map(r => imgB64(thumb(r.l.id)).catch(() => '')));
   const page = (part, first, last, pn, pc) => `<div class="qpage">
     ${first ? `<div class="qhead"><div><div class="qbrand">${esc(S.name)}</div><div class="qsub">عرض سعر</div></div>
       <div class="qinfo"><div>رقم العرض: <b>${esc(ADM.no)}</b></div><div>التاريخ: ${d(today)}</div><div>صالح حتى: ${d(until)}</div><div>الزبون: <b>${esc(ADM.r || ADM.c || '-')}</b></div></div></div>` : `<div class="qhead small"><b>${esc(S.name)}</b> — عرض سعر ${esc(ADM.no)}</div>`}
-    <table class="qt"><thead><tr><th>#</th><th>الصورة</th><th>الصنف</th><th>المقاس</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead><tbody>
+    ${part.length || !last ? '' : `<div class="qtotbox">إجمالي العرض: <b>${money(tot)} د.ل</b> (${ADM.lines.length} صنف)</div>`}<table class="qt" ${part.length ? '' : 'style="display:none"'}><thead><tr><th>#</th><th>الصورة</th><th>الصنف</th><th>المقاس</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead><tbody>
     ${part.map(({ r, i }) => `<tr><td>${i + 1}</td><td>${imgs[i] ? `<img src="${imgs[i]}">` : ''}</td><td><b>${esc(r.l.ar)}</b><br><small>${esc(r.l.id)}</small></td><td>${esc(r.l.size)}</td><td>${r.l.q}</td>
       <td>${r.s == null ? 'يُحدَّد لاحقاً' : money(r.s) + ' د.ل'}</td><td>${r.t == null ? '-' : money(r.t) + ' د.ل'}</td></tr>`).join('')}
     </tbody>${last ? `<tfoot><tr><td colspan="6">الإجمالي</td><td>${money(tot)} د.ل</td></tr></tfoot>` : ''}</table>
-    ${last ? `<div class="qnote">الأسعار بالدينار الليبي وتشمل الشحن. العرض صالح حتى ${d(until)}. لتأكيد الطلب راسلنا على واتساب برقم العرض.</div>` : ''}
+    ${last ? `<div class="qterms"><div class="qth">الشروط والملاحظات</div><div class="qti"><span class="qn">1</span><span>الأسعار بالدينار الليبي وتشمل الشحن.</span></div><div class="qti"><span class="qn">2</span><span>هذا العرض صالح لمدة ${+$('#qDays').value || 7} أيام، حتى تاريخ ${d(until)}.</span></div><div class="qti"><span class="qn">3</span><span>عند الموافقة على العرض يُدفع عربون لا يقل عن ${dep}% من قيمة الطلبية (${money(Math.ceil(tot * dep / 100))} د.ل على الأقل).</span></div><div class="qti"><span class="qn">4</span><span>يمكن الدفع بجميع الطرق: نقداً (كاش) أو عن طريق المصرف.</span></div><div class="qti"><span class="qn">5</span><span>يبدأ تجهيز الطلبية بعد استلام العربون.</span></div><div class="qti"><span class="qn">6</span><span>عند جاهزية الطلبية نبلغكم بذلك، ولا تُسلَّم الطلبية إلا بعد سداد باقي قيمتها.</span></div><div class="qti"><span class="qn">7</span><span>لتأكيد الطلب راسلنا على واتساب مع ذكر رقم العرض: ${esc(ADM.no)}.</span></div></div>` : ''}
     <div class="qfoot">صفحة ${pn} من ${pc}</div></div>`;
   const all = rows.map((r, i) => ({ r, i })), per1 = 7, per = 9, parts = [all.slice(0, per1)];
   for (let i = per1; i < all.length; i += per) parts.push(all.slice(i, i + per));
+  if (parts[parts.length - 1].length > (parts.length === 1 ? 4 : 5)) parts.push([]);
   $('#qdoc').innerHTML = parts.map((p, k) => page(p, k === 0, k === parts.length - 1, k + 1, parts.length)).join('');
   toast('جارٍ إنشاء الملف…');
   const { jsPDF } = window.jspdf, pdf = new jsPDF({ unit: 'mm', format: 'a4' });
