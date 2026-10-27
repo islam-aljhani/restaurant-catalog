@@ -94,12 +94,15 @@ Promise.all([fetch('data/products.json').then(r => r.json()), fetch('data/gal.js
   renderTiles(); route(); renderCart();
 });
 const GICON = {};
+const PAR = () => DATA.parents || {};
+const inG = (p, g) => g === 'الكل' || p.g === g || (PAR()[g] || []).includes(p.g);
+const parentOf = g => Object.keys(PAR()).find(k => PAR()[k].includes(g));
+const tops = () => (DATA.top || DATA.groups).filter(g => DATA.products.some(p => inG(p, g)));
 function renderTiles() {
   $('#hName').textContent = S.name;
-  const gs = DATA.groups.filter(g => DATA.products.some(p => p.g === g));
-  const pick = g => { const L = DATA.products.filter(p => g === 'الكل' || p.g === g); return L[Math.min(L.length - 1, 6)]; };
-  $('#tiles').innerHTML = [...gs, 'الكل'].map(g => { const p = pick(g), n = DATA.products.filter(x => g === 'الكل' || x.g === g).length;
-    return `<button class="tile" data-g="${esc(g)}"><span class="ti"><img src="thumb/${p.id}.jpg" alt="" loading="lazy"></span>
+  const pick = g => { const L = DATA.products.filter(p => inG(p, g) && nImg(p) && (PAR()[g] || p.id >= 'A-3001')); const M = L.length ? L : DATA.products.filter(p => inG(p, g)); return M[Math.min(M.length - 1, 6)]; };
+  $('#tiles').innerHTML = [...tops(), 'الكل'].map(g => { const p = pick(g), n = DATA.products.filter(x => inG(x, g)).length;
+    return `<button class="tile" data-g="${esc(g)}"><span class="ti"><img src="${thumbOf(p)}" data-fb="thumb/${p.id}.jpg" ${FB} alt="" loading="lazy"></span>
       <span class="tn">${g === 'الكل' ? 'كل الأصناف' : esc(g)}</span><span class="tc">${n} صنفاً</span></button>`; }).join('');
   $('#tiles').querySelectorAll('.tile').forEach(b => b.onclick = () => { location.hash = 'c=' + encodeURIComponent(b.dataset.g); });
 }
@@ -115,14 +118,20 @@ $('#back').onclick = () => { location.hash = ''; };
 $('#hCart').onclick = () => openC(true);
 
 function renderChips() {
-  const gs = ['الكل', ...DATA.groups.filter(g => DATA.products.some(p => p.g === g))];
-  $('#chips').innerHTML = gs.map(g => `<button class="chip ${g === group ? 'on' : ''}" data-g="${esc(g)}">${esc(g)}</button>`).join('');
-  $('#chips').querySelectorAll('.chip').forEach(b => b.onclick = () => { location.hash = 'c=' + encodeURIComponent(b.dataset.g); });
+  const par = PAR()[group] ? group : parentOf(group);
+  const gs = par ? [par, ...PAR()[par].filter(g => DATA.products.some(p => p.g === g))] : ['الكل', ...tops()];
+  const lab = g => g === par ? 'كل ' + g : g;
+  $('#chips').innerHTML = (par ? `<button class="chip" data-g="">← كل التصنيفات</button>` : '') +
+    gs.map(g => `<button class="chip ${g === group ? 'on' : ''}" data-g="${esc(g)}">${esc(lab(g))}</button>`).join('');
+  $('#chips').querySelectorAll('.chip').forEach(b => b.onclick = () => { location.hash = b.dataset.g ? 'c=' + encodeURIComponent(b.dataset.g) : ''; });
+  $('#series').hidden = !DATA.products.some(p => inG(p, group) && p.s);
+  if ($('#series').hidden) $('#series').value = '';
 }
 function apply() {
   const q = $('#q').value.trim().toLowerCase(), s = $('#series').value;
-  LIST = DATA.products.filter(p => (group === 'الكل' || p.g === group) && (!s || p.s == s) &&
+  LIST = DATA.products.filter(p => inG(p, group) && (!s || p.s == s) &&
     (!q || p.ar.includes(q) || p.id.toLowerCase().includes(q)));
+  if (!PAR()[group] && group === 'الكل') { const T = tops(), ti = p => { const i = T.indexOf(p.g); return i < 0 ? T.indexOf(parentOf(p.g)) : i; }; LIST = LIST.map((p, i) => [ti(p), i, p]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]); }
   $('#grid').innerHTML = ''; shown = 0; more();
   $('#count').textContent = `${LIST.length} صنفاً`;
 }
