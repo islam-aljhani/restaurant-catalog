@@ -81,8 +81,10 @@ let cart = []; try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } 
 const saveCart = () => { try { localStorage.setItem('cart', JSON.stringify(cart)); } catch (e) {} };
 
 let GAL = {};
-const nImg = p => (p.h && GAL[p.h]) || 0;
-const thumbOf = p => nImg(p) ? `thumb/x/${p.h}-1.jpg` : `thumb/${p.id}.jpg`;
+const galOf = p => { let g = p.h && GAL[p.h]; if (typeof g === 'string') { const [b, k] = g.split(':'); return { b, k: +k }; } return g ? { b: p.h, k: g } : null; };
+const nImg = p => (galOf(p) || {}).k || 0;
+const gb = p => (galOf(p) || {}).b;
+const thumbOf = p => nImg(p) ? `thumb/x/${gb(p)}-1.jpg` : `thumb/${p.id}.jpg`;
 const FB = `onerror="if(!this.dataset.f){this.dataset.f=1;this.src=this.dataset.fb}"`;
 Promise.all([fetch('data/products.json').then(r => r.json()), fetch('data/gal.json').then(r => r.ok ? r.json() : {}).catch(() => ({}))]).then(([d, g]) => { GAL = g || {};
   DATA = d; d.products.forEach(p => P[p.id] = p);
@@ -230,9 +232,9 @@ document.addEventListener('click', e => { const b = e.target.closest('.share'); 
 let LB = null;
 function openLB(id) {
   const p = P[id]; LB = p; const k = nImg(p);
-  const big = i => k ? `img/x/${p.h}-${i}.jpg` : `img/${p.id}.jpg`;
+  const big = i => k ? `img/x/${gb(p)}-${i}.jpg` : `img/${p.id}.jpg`;
   const pic = $('#lbpic'); pic.dataset.f = ''; pic.dataset.fb = `img/${p.id}.jpg`; pic.setAttribute('onerror', 'if(!this.dataset.f){this.dataset.f=1;this.src=this.dataset.fb}'); pic.src = big(1);
-  $('#lbthumbs').innerHTML = k > 1 ? Array.from({ length: k }, (_, i) => `<button class="${i ? '' : 'on'}" data-i="${i + 1}"><img src="thumb/x/${p.h}-${i + 1}.jpg" alt=""></button>`).join('') : '';
+  $('#lbthumbs').innerHTML = k > 1 ? Array.from({ length: k }, (_, i) => `<button class="${i ? '' : 'on'}" data-i="${i + 1}"><img src="thumb/x/${gb(p)}-${i + 1}.jpg" alt=""></button>`).join('') : '';
   $('#lbthumbs').querySelectorAll('button').forEach(b => b.onclick = e => { e.stopPropagation(); pic.dataset.f = ''; pic.src = big(b.dataset.i); $('#lbimg').classList.remove('z');
     $('#lbthumbs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); });
   $('#lbnm').textContent = p.ar;
