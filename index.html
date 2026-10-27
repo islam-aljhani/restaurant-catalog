@@ -192,7 +192,10 @@ function renderCart() {
   $('#sbar').hidden = !n; document.body.classList.toggle('has-sbar', !!n);
   $('#sbtxt').textContent = n ? `طلبك: ${n === 1 ? 'صنف واحد' : n === 2 ? 'صنفان' : n <= 10 ? n + ' أصناف' : n + ' صنفاً'} · ${q} قطعة` : '';
 }
-const openC = o => { $('#drawer').classList.toggle('open', o); $('#ov').classList.toggle('open', o); };
+const layer = () => history.state && history.state.layer;
+const pushLayer = n => history.pushState({ layer: n }, '', location.href);
+const setC = o => { $('#drawer').classList.toggle('open', o); $('#ov').classList.toggle('open', o); };
+const openC = o => { if (o) { if (!$('#drawer').classList.contains('open')) { setC(true); pushLayer('cart'); } } else if (layer() === 'cart') history.back(); else setC(false); };
 $('#openCart').onclick = () => openC(true); $('#closeCart').onclick = $('#ov').onclick = () => openC(false);
 ['rname'].forEach(k => { try { $('#' + k).value = localStorage.getItem('f_' + k) || ''; } catch (e) {} });
 
@@ -214,7 +217,7 @@ $('#send').onclick = async () => {
   if (!no) no = localNo();
   const txt = lines.map((l, i) => `${i + 1}) ${l.ar}\n   رقم الصنف: ${l.id} — المقاس: ${l.size} — الكمية: ${l.q}`).join('\n');
   const msg = `طلب عرض سعر\nرقم الطلب: ${no}\nالمطعم / الاسم: ${f.rname}\n\nالأصناف:\n${txt}`;
-  cart = []; saveCart(); renderCart(); openC(false);
+  cart = []; saveCart(); renderCart(); setC(false); if (layer() === 'cart') history.replaceState(null, '', location.href);
   btn.textContent = 'أرسل الطلب عبر واتساب';
   location.href = `https://wa.me/${S.ownerWhatsApp}?text=${encodeURIComponent(msg)}`;
 };
@@ -244,19 +247,27 @@ function openLB(id) {
   const big = i => k ? `img/x/${gb(p)}-${i}.jpg` : `img/${p.id}.jpg`;
   const pic = $('#lbpic'); pic.dataset.f = ''; pic.dataset.fb = `img/${p.id}.jpg`; pic.setAttribute('onerror', 'if(!this.dataset.f){this.dataset.f=1;this.src=this.dataset.fb}'); pic.src = big(1);
   $('#lbthumbs').innerHTML = k > 1 ? Array.from({ length: k }, (_, i) => `<button class="${i ? '' : 'on'}" data-i="${i + 1}"><img src="thumb/x/${gb(p)}-${i + 1}.jpg" alt=""></button>`).join('') : '';
-  $('#lbthumbs').querySelectorAll('button').forEach(b => b.onclick = e => { e.stopPropagation(); pic.dataset.f = ''; pic.src = big(b.dataset.i); $('#lbimg').classList.remove('z');
+  $('#lbthumbs').querySelectorAll('button').forEach(b => b.onclick = e => { e.stopPropagation(); pic.dataset.f = ''; pic.src = big(b.dataset.i); unzoom();
     $('#lbthumbs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); });
   $('#lbnm').textContent = p.ar;
   $('#lbcode').textContent = `رقم الصنف: ${p.id}` + (p.s ? ` · تشكيلة ${p.s}` : '');
   $('#lbsize').innerHTML = p.v.length > 1 ? `<select id="lbv">${p.v.map((v, i) => `<option value="${i}">${esc(v.ar)}</option>`).join('')}</select>` : `<div class="code">المقاس: ${esc(p.v[0].ar)}</div>`;
-  $('#lbq').value = 1; $('#lbimg').classList.remove('z'); $('#lb').classList.add('open'); document.body.style.overflow = 'hidden';
+  $('#lbq').value = 1; $('#lbimg').classList.remove('z'); if (!$('#lb').classList.contains('open')) pushLayer('lb'); $('#lb').classList.add('open'); document.body.style.overflow = 'hidden';
 }
-function closeLB() { $('#lb').classList.remove('open'); document.body.style.overflow = '';
+function closeLB() { if (layer() === 'zoom') { history.go(-2); return; } if (layer() === 'lb') { history.back(); return; } doCloseLB(); }
+const unzoom = () => { if (layer() === 'zoom') history.back(); else $('#lbimg').classList.remove('z'); };
+window.addEventListener('popstate', () => {
+  if ($('#lbimg').classList.contains('z') && layer() !== 'zoom') $('#lbimg').classList.remove('z');
+  if ($('#lb').classList.contains('open') && layer() !== 'lb' && layer() !== 'zoom') doCloseLB();
+  if ($('#drawer').classList.contains('open') && layer() !== 'cart') setC(false);
+});
+function doCloseLB() { $('#lb').classList.remove('open'); $('#lbimg').classList.remove('z'); document.body.style.overflow = '';
   if (/p=A-/.test(location.hash)) history.replaceState(null, '', '#c=' + encodeURIComponent(group)); }
 $('#lbx').onclick = closeLB; $('#lb').onclick = e => { if (e.target.id === 'lb') closeLB(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLB(); });
 $('#lbimg').onclick = e => { const box = $('#lbimg'), img = $('#lbpic');
-  if (box.classList.toggle('z')) { const r = box.getBoundingClientRect(); img.style.transformOrigin = `${(e.clientX - r.left) / r.width * 100}% ${(e.clientY - r.top) / r.height * 100}%`; } };
+  if (box.classList.contains('z')) { unzoom(); return; }
+  box.classList.add('z'); pushLayer('zoom'); { const r = box.getBoundingClientRect(); img.style.transformOrigin = `${(e.clientX - r.left) / r.width * 100}% ${(e.clientY - r.top) / r.height * 100}%`; } };
 $('#lbimg').onmousemove = e => { const box = $('#lbimg'); if (!box.classList.contains('z')) return; const r = box.getBoundingClientRect();
   $('#lbpic').style.transformOrigin = `${(e.clientX - r.left) / r.width * 100}% ${(e.clientY - r.top) / r.height * 100}%`; };
 document.querySelectorAll('#lb .qty button').forEach(b => b.onclick = () => { $('#lbq').value = Math.max(1, (+$('#lbq').value || 1) + (+b.dataset.d)); });
