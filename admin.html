@@ -283,11 +283,13 @@ $('#qPdf').onclick = async () => {
     ${last ? `<div class="qterms"><div class="qth">الشروط والملاحظات</div><div class="qti"><span class="qn">1</span><span>الأسعار بالدينار الليبي وتشمل الشحن.</span></div><div class="qti"><span class="qn">2</span><span>هذا العرض صالح لمدة ${+$('#qDays').value || 7} أيام، حتى تاريخ ${d(until)}.</span></div><div class="qti"><span class="qn">3</span><span>عند الموافقة على العرض يُدفع عربون لا يقل عن ${dep}% من قيمة الطلبية (${money(Math.ceil(tot * dep / 100))} د.ل على الأقل).</span></div><div class="qti"><span class="qn">4</span><span>يمكن الدفع بجميع الطرق: نقداً (كاش) أو عن طريق المصرف.</span></div><div class="qti"><span class="qn">5</span><span>يبدأ تجهيز الطلبية بعد استلام العربون.</span></div><div class="qti"><span class="qn">6</span><span>عند تجهيز الطلبية بالكامل نبلغكم بذلك، ولا تُسلَّم الطلبية إلا بعد سداد باقي قيمتها.</span></div><div class="qti"><span class="qn">7</span><span>لتأكيد الطلب راسلنا على واتساب مع ذكر رقم العرض: ${esc(ADM.no)}.</span></div></div>` : ''}
     <div class="qfoot">صفحة ${pn} من ${pc}</div></div>`;
   const all = rows.map((r, i) => ({ r, i })), parts = [];
-  if (all.length <= 4) parts.push(all);
+  // fill pages fully; the last page keeps at least one item together with the terms
+  const CAP1 = 11, CAP = 12, CAP1T = 7, CAPT = 8;
+  if (all.length <= CAP1T) parts.push(all);
   else {
-    const lastN = Math.min(5, all.length - 1), rest = all.slice(0, all.length - lastN);
-    parts.push(rest.slice(0, 7)); for (let i = 7; i < rest.length; i += 9) parts.push(rest.slice(i, i + 9));
-    parts.push(all.slice(all.length - lastN));
+    let i = Math.min(CAP1, all.length - 1); parts.push(all.slice(0, i));
+    while (all.length - i > CAPT) { const n = Math.min(CAP, all.length - i - 1); parts.push(all.slice(i, i + n)); i += n; }
+    parts.push(all.slice(i));
   }
   $('#qdoc').innerHTML = parts.map((p, k) => page(p, k === 0, k === parts.length - 1, k + 1, parts.length)).join('');
   toast('جارٍ إنشاء الملف…');
