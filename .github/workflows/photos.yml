@@ -1,0 +1,25 @@
+name: Sync product photos
+on:
+  push:
+    paths: ['tools/want.txt', 'tools/fetch_photos.py']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: photos
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install pillow
+      - run: python tools/fetch_photos.py
+      - name: Commit photos
+        run: |
+          git config user.name "photo-sync"
+          git config user.email "actions@users.noreply.github.com"
+          git add img/x thumb/x data/gal.json
+          git diff --cached --quiet || git commit -m "Sync product photos"
+          git pull --rebase -q && git push
