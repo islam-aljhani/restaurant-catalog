@@ -60,12 +60,14 @@
           <label>صلاحية العرض (أيام) <input id="qDays" type="number" step="1" value="7"></label>
         </div>
         <div class="tw"><table>
-          <thead><tr><th>#</th><th>الصنف</th><th>الكمية</th><th>تكلفة المورّد</th><th>سعر البيع للوحدة (د.ل)</th><th>الإجمالي (د.ل)</th></tr></thead>
-          <tbody id="qBody"></tbody><tfoot><tr><td colspan="5"><b>الإجمالي</b></td><td><b id="qTot"></b></td></tr></tfoot>
+          <thead><tr><th>#</th><th>الصنف</th><th>الكمية</th><th>تكلفة المورّد</th><th>آخر مرة</th><th>سعر البيع للوحدة (د.ل)</th><th>الإجمالي (د.ل)</th></tr></thead>
+          <tbody id="qBody"></tbody><tfoot><tr><td colspan="6"><b>الإجمالي</b></td><td><b id="qTot"></b></td></tr></tfoot>
         </table></div>
+        <div class="qsum" id="qSum"></div>
         <div class="note">يمكنك تعديل سعر البيع لأي صنف يدوياً. الزبون لا يرى أسعار المورّد ولا أرقامه.</div>
         <div class="acts">
           <button class="xl" id="qPdf">٤. إنشاء عرض السعر PDF للزبون</button>
+          <button class="tg" id="qSave">حفظ الأسعار في الشيت</button>
         </div>
       </div>
     </div>
@@ -79,7 +81,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const toast = m => { const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 2400); };
 let KEY = ''; try { KEY = localStorage.getItem('adminKey') || ''; } catch (e) {}
-let ORD = [], ORIG = {}, ADM = null, PROD = {}, GAL = {};
+let ORD = [], ORIG = {}, ADM = null, PROD = {}, GAL = {}, PRICES = [];
 fetch('data/products.json').then(r => r.json()).then(d => d.products.forEach(p => PROD[p.id] = p)).catch(() => {});
 fetch('data/gal.json').then(r => r.json()).then(g => GAL = g).catch(() => {});
 const thumb = id => { const p = PROD[id]; let g = p && p.h && GAL[p.h]; if (typeof g === 'string') return `thumb/x/${g.split(':')[0]}-1.jpg`; return g ? `thumb/x/${p.h}-1.jpg` : `thumb/${id}.jpg`; };
@@ -102,8 +104,8 @@ async function post(body) {
 async function start() {
   if (!S.appsScriptUrl) { $('#lerr').hidden = false; $('#lerr').textContent = 'لم يُضَف رابط Google Apps Script في config.js بعد.'; return; }
   try {
-    const [o, g] = await Promise.all([api({ action: 'orders' }), api({ action: 'originals' })]);
-    ORD = o.orders; ORIG = g.originals;
+    const [o, g, h] = await Promise.all([api({ action: 'orders' }), api({ action: 'originals' }), api({ action: 'prices' }).catch(() => ({ prices: [] }))]);
+    ORD = o.orders; ORIG = g.originals; PRICES = h.prices || [];
     try { localStorage.setItem('adminKey', KEY); } catch (e) {}
     $('#login').hidden = true; $('#app').hidden = false; renderList();
   } catch (e) { $('#lerr').hidden = false; $('#lerr').textContent = e.message === 'auth' ? 'كلمة السر غير صحيحة' : 'تعذّر الاتصال: ' + e.message; }
@@ -199,18 +201,40 @@ function sellOf(cost) {
   const v = cost * +$('#qRate').value * (1 + +$('#qShip').value / 100) * (1 + +$('#qMar').value / 100), r = +$('#qRnd').value || 0;
   return r > 0 ? Math.ceil(v / r) * r : Math.round(v * 100) / 100;
 }
+const pct = (a, b) => b ? ((a - b) / b) * 100 : null;
+const sgn = x => x == null ? '' : `<span class="${x > 0.5 ? 'up' : x < -0.5 ? 'dn' : 'eq'}">${x > 0 ? '+' : ''}${x.toFixed(1)}%</span>`;
+function lastOf(vid, no) { return PRICES.filter(p => p.vid === vid && p.no !== no && p.cost !== '' && p.cost != null).sort((a, b) => b.t - a.t)[0]; }
+const landed = c => c == null ? null : c * +$('#qRate').value * (1 + +$('#qShip').value / 100);
+function rowsQ(q) { return ADM.lines.map((l, i) => { const c = q.cost[i], s = q.manual && q.manual[i] != null ? q.manual[i] : sellOf(c); return { l, i, c, s, cl: landed(c), last: lastOf(l.vid, ADM.no) }; }); }
 function renderQuote() {
   const q = loadQ(ADM.no); $('#quote').hidden = !q; if (!q) return;
   if (q.cur) $('#qCur').value = q.cur;
-  let tot = 0;
-  $('#qBody').innerHTML = ADM.lines.map((l, i) => {
-    const c = q.cost[i], s = q.manual && q.manual[i] != null ? q.manual[i] : sellOf(c), t = s == null ? null : s * l.q; if (t) tot += t;
+  const R = rowsQ(q); let tot = 0, totC = 0, chg = [];
+  $('#qBody').innerHTML = R.map(({ l, i, c, s, cl, last }) => {
+    const t = s == null ? null : s * l.q; if (t) tot += t; if (cl != null) totC += cl * l.q;
+    let h = '<small class="mut">أول مرة</small>';
+    if (last) {
+      const same = last.cur === $('#qCur').value, ch = c == null ? null : same ? pct(c, +last.cost) : pct(cl, +last.costL); if (ch != null) chg.push(ch);
+      h = `<small>${new Date(last.t).toLocaleDateString('ar-LY')} · ${esc(last.no)}</small><br>تكلفة: <span class="en">${money(+last.cost)} ${esc(last.cur)}</span> ${sgn(ch)}<br>بيع: ${money(+last.sell)} د.ل ${s == null ? '' : sgn(pct(s, +last.sell))}`;
+    }
     return `<tr><td>${i + 1}</td><td>${esc(l.id)} ${esc(l.ar)}<br><small>${esc(l.size)}</small></td><td>${l.q}</td>
-      <td class="en">${c == null ? '<span class="warn">لا يوجد سعر</span>' : money(c) + ' ' + esc($('#qCur').value)}</td>
+      <td class="en">${c == null ? '<span class="warn">لا يوجد سعر</span>' : money(c) + ' ' + esc($('#qCur').value)}</td><td class="hist">${h}</td>
       <td><input class="qin" data-i="${i}" type="number" step="0.5" value="${s ?? ''}"></td><td>${money(t)}</td></tr>`; }).join('');
   $('#qTot').textContent = money(tot) + ' د.ل';
+  const prof = tot - totC, avg = chg.length ? chg.reduce((a, b) => a + b, 0) / chg.length : null;
+  $('#qSum').innerHTML = `<div>التكلفة الواصلة (مع الشحن): <b>${money(Math.round(totC))} د.ل</b></div><div>البيع: <b>${money(tot)} د.ل</b></div>
+    <div>الربح: <b>${money(Math.round(prof))} د.ل</b> ${tot ? `(${(prof / tot * 100).toFixed(1)}% من البيع)` : ''}</div>
+    <div>تغيّر تكلفة المورّد عن آخر مرة: <b>${avg == null ? 'لا توجد أسعار سابقة' : sgn(avg) + ` (متوسط ${chg.length} صنف)`}</b></div>`;
   $('#qBody').querySelectorAll('.qin').forEach(inp => inp.onchange = () => { q.manual = q.manual || {}; q.manual[inp.dataset.i] = inp.value === '' ? null : +inp.value; saveQ(ADM.no, q); renderQuote(); });
 }
+async function savePrices(silent) {
+  const q = loadQ(ADM.no); if (!q) return;
+  const rows = rowsQ(q).filter(r => r.c != null).map(r => ({ vid: r.l.vid, id: r.l.id, cost: r.c, cur: $('#qCur').value, rate: +$('#qRate').value, costL: Math.round(r.cl * 100) / 100, sell: r.s, q: r.l.q }));
+  try { await post({ action: 'prices', no: ADM.no, rows }); const now = Date.now();
+    PRICES = PRICES.filter(p => p.no !== ADM.no).concat(rows.map(r => ({ ...r, no: ADM.no, t: now }))); if (!silent) toast(`تم حفظ ${rows.length} سعر في الشيت`); }
+  catch (e) { toast('لم تُحفظ الأسعار: ' + (e.message === 'unknown action' ? 'حدّث Apps Script أولاً' : e.message)); }
+}
+$('#qSave').onclick = () => savePrices();
 qset.forEach(k => $('#' + k).oninput = () => {
   const d = {}; qset.forEach(x => d[x] = $('#' + x).value); try { localStorage.setItem('quoteDefaults', JSON.stringify(d)); } catch (e) {}
   if (ADM) { const q = loadQ(ADM.no); if (q) { q.cur = $('#qCur').value; saveQ(ADM.no, q); renderQuote(); } }
@@ -255,7 +279,7 @@ $('#qPdf').onclick = async () => {
     const cv = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff' });
     if (k) pdf.addPage(); pdf.addImage(cv.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, 210, 297);
   }
-  $('#qdoc').innerHTML = '';
+  $('#qdoc').innerHTML = ''; savePrices(true);
   const name = `Quote_${ADM.no}.pdf`, blob = pdf.output('blob'), file = new File([blob], name, { type: 'application/pdf' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: 'عرض سعر ' + ADM.no }); } catch (e) {} }
   else { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); }
