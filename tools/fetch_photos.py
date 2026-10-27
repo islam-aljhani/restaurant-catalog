@@ -33,11 +33,21 @@ for n, sku in enumerate(todo, 1):
         page = get(f'https://www.idfine.com.tr/urun/{sku}').decode('utf-8', 'ignore')
     except Exception as e:
         print(n, 'page fail', repr(e)); continue
-    med = re.findall(r'https://cdn\.idfine\.com\.tr/products/\d+/[^"\'\s)]+?_medium\.webp', page)
+    pg = page.replace('\\/', '/').replace('&amp;', '&')
+    hits = re.findall(r'cdn\.idfine\.com\.tr/products/(\d+)/([A-Za-z0-9_.\-]+?)\.(webp|jpg|jpeg|png)', pg)
+    base = {}
+    for folder, name, ext in hits:
+        core = re.sub(r'_(small|medium|large|thumb)$', '', name)
+        key = (folder, core, ext)
+        base.setdefault(key, set()).add(name != core)
+    og = re.search(r'property="og:image"\s+content="([^"]+)"', pg)
     urls = []
-    for m in med:
-        u = m.replace('_medium.webp', '.webp')
-        if u not in urls: urls.append(u)
+    if og and '/products/' in og.group(1): urls.append(og.group(1))
+    for (folder, core, ext), sized in base.items():
+        if True in sized:   # gallery images come in several sizes; related-product tiles do not
+            u = f'https://cdn.idfine.com.tr/products/{folder}/{core}.{ext}'
+            if u not in urls: urls.append(u)
+    if n == 1: print('hits', len(hits), 'sample', hits[:4], 'og', og.group(1) if og else None)
     urls = urls[:5]
     if not urls: print(n, 'no gallery urls, page chars', len(page), page[:200].replace('\n',' '))
     k = 0
