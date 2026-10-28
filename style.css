@@ -237,7 +237,7 @@ body.has-sbar .toast{bottom:84px}
 .lborig{font-size:13px;color:var(--accent);margin-top:4px;font-weight:700}
 .qorig{color:#b8913a;font-size:11px}
 
-.aifab{position:fixed;left:16px;bottom:20px;z-index:45;border:0;border-radius:999px;padding:12px 18px;background:var(--accent);color:#111;font:inherit;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.4);cursor:pointer}
+.aifab{position:fixed;left:14px;bottom:18px;z-index:45;display:flex;align-items:center;gap:6px;border:1.5px solid var(--accent);border-radius:999px;padding:6px 14px 6px 8px;background:#0d1524;color:var(--accent);font:inherit;font-weight:800;box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 0 0 rgba(201,165,76,.6);cursor:pointer;animation:aipulse 2.6s infinite}
 body.has-sbar .aifab{bottom:84px}
 .aibox{position:fixed;left:12px;bottom:12px;z-index:60;width:min(400px,calc(100vw - 24px));height:min(600px,calc(100vh - 90px));background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:16px;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.55);overflow:hidden}
 .aibox[hidden]{display:none}
@@ -257,3 +257,14 @@ body.has-sbar .aifab{bottom:84px}
 .dots i:nth-child(2){animation-delay:.2s}.dots i:nth-child(3){animation-delay:.4s}
 @keyframes dt{0%,100%{opacity:.25}50%{opacity:1}}
 #lb{z-index:70}
+
+.aiico{width:38px;height:38px;flex:none;animation:aibob 3s ease-in-out infinite}.aiico.sm{width:30px;height:30px;animation:none}
+.aiico .spark{transform-origin:41px 10px;animation:aispark 1.8s ease-in-out infinite}
+@keyframes aipulse{0%{box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 0 0 rgba(201,165,76,.55)}70%{box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 0 14px rgba(201,165,76,0)}100%{box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 0 0 rgba(201,165,76,0)}}
+@keyframes aibob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes aispark{0%,100%{opacity:.3;transform:scale(.7)}50%{opacity:1;transform:scale(1.15)}}
+.aitip{position:fixed;left:14px;bottom:78px;z-index:46;max-width:230px;background:var(--accent);color:#111;font-weight:700;font-size:14px;padding:10px 14px;border-radius:14px 14px 14px 4px;box-shadow:0 8px 24px rgba(0,0,0,.45);cursor:pointer;animation:aipop .35s ease-out}
+.aitip[hidden]{display:none}
+body.has-sbar .aitip{bottom:142px}
+@keyframes aipop{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.aifab,.aiico,.aiico .spark{animation:none}}

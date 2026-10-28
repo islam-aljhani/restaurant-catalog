@@ -67,9 +67,16 @@
   </div>
 </div>
 <div class="sbar" id="sbar" hidden><span id="sbtxt"></span><button id="sbgo">أرسل الطلب ←</button></div>
-<button class="aifab" id="aifab" hidden aria-label="المساعد"><span>💬</span> مساعد</button>
+<div class="aitip" id="aitip" hidden>تحتاج مساعدة؟ اسألني عن أي صنف 👋</div>
+<button class="aifab" id="aifab" hidden aria-label="المساعد الذكي"><svg class="aiico" viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="aig" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6e3a6"/><stop offset="1" stop-color="#c9a54c"/></linearGradient></defs>
+<rect x="9" y="13" width="30" height="24" rx="9" fill="#141f34" stroke="url(#aig)" stroke-width="2.5"/><circle cx="19" cy="25" r="3.2" fill="#f6e3a6"/><circle cx="29" cy="25" r="3.2" fill="#f6e3a6"/>
+<path d="M19 31.5q5 3 10 0" stroke="#f6e3a6" stroke-width="2.2" fill="none" stroke-linecap="round"/><line x1="24" y1="13" x2="24" y2="7" stroke="url(#aig)" stroke-width="2.5"/><circle cx="24" cy="6" r="2.6" fill="#f6e3a6"/>
+<path class="spark" d="M41 6l1.3 3 3 1.3-3 1.3L41 15l-1.3-3.4-3-1.3 3-1.3z" fill="#f6e3a6"/></svg><span>مساعد ذكي</span></button>
 <div class="aibox" id="aibox" hidden>
-  <div class="aihd"><b>مساعد الكتالوج</b><small>يساعدك تلقى الأصناف</small><button id="aix" aria-label="إغلاق">✕</button></div>
+  <div class="aihd"><svg class="aiico sm" viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="aig" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6e3a6"/><stop offset="1" stop-color="#c9a54c"/></linearGradient></defs>
+<rect x="9" y="13" width="30" height="24" rx="9" fill="#141f34" stroke="url(#aig)" stroke-width="2.5"/><circle cx="19" cy="25" r="3.2" fill="#f6e3a6"/><circle cx="29" cy="25" r="3.2" fill="#f6e3a6"/>
+<path d="M19 31.5q5 3 10 0" stroke="#f6e3a6" stroke-width="2.2" fill="none" stroke-linecap="round"/><line x1="24" y1="13" x2="24" y2="7" stroke="url(#aig)" stroke-width="2.5"/><circle cx="24" cy="6" r="2.6" fill="#f6e3a6"/>
+<path class="spark" d="M41 6l1.3 3 3 1.3-3 1.3L41 15l-1.3-3.4-3-1.3 3-1.3z" fill="#f6e3a6"/></svg><b>المساعد الذكي</b><small>يساعدك تلقى الأصناف</small><button id="aix" aria-label="إغلاق">✕</button></div>
   <div class="aimsgs" id="aimsgs"></div>
   <form class="aiform" id="aiform"><input id="aiq" placeholder="اكتب ما تبحث عنه… مثلاً: ستاند كيك دوّار" autocomplete="off" maxlength="300"><button>إرسال</button></form>
 </div>
@@ -303,7 +310,7 @@ function aiMsg(role, html) { const d = document.createElement('div'); d.classNam
 function aiCards(ids) { return ids.length ? `<div class="aicards">${ids.map(id => { const p = P[id]; if (!p) return '';
   return `<button class="aicard" data-id="${p.id}"><img src="${thumbOf(p)}" data-fb="thumb/${p.id}.jpg" ${FB} alt=""><span>${esc(p.ar)}</span><small>${p.id}${p.v.length > 1 ? ' · ' + p.v.length + ' مقاسات' : ''}</small></button>`; }).join('')}</div>` : ''; }
 function aiOpen(o) { $('#aibox').hidden = !o; if (o) { if (!$('#aimsgs').children.length) aiMsg('a', 'أهلاً بك 👋 اكتب لي ما تبحث عنه، مثلاً «طقم ملاحات للطاولة» أو «غطاء أكريليك للبوفيه»، وأقترح لك الأصناف المناسبة.'); setTimeout(() => $('#aiq').focus(), 50); if (layer() !== 'ai') pushLayer('ai'); } else if (layer() === 'ai') history.back(); }
-$('#aifab').onclick = () => aiOpen(true); $('#aix').onclick = () => aiOpen(false);
+$('#aifab').onclick = () => { $('#aitip').hidden = true; aiOpen(true); }; $('#aix').onclick = () => aiOpen(false);
 window.addEventListener('popstate', () => { if (!$('#aibox').hidden && layer() !== 'ai') $('#aibox').hidden = true; });
 $('#aimsgs').addEventListener('click', e => { const c = e.target.closest('.aicard'); if (c) openLB(c.dataset.id); });
 $('#aiform').onsubmit = async e => {
@@ -321,6 +328,9 @@ $('#aiform').onsubmit = async e => {
   AIH.push({ r: 'u', t: q }, { r: 'a', t: reply + (ids.length ? ' [' + ids.join(', ') + ']' : '') }); AIH = AIH.slice(-6);
 };
 if (S.assistant || /[?&]ai=1/.test(location.search)) $('#aifab').hidden = false;
+if (!$('#aifab').hidden) { let seen = false; try { seen = sessionStorage.getItem('aitip') === '1'; } catch (e) {}
+  if (!seen) setTimeout(() => { if ($('#aibox').hidden) { $('#aitip').hidden = false; setTimeout(() => $('#aitip').hidden = true, 7000); } try { sessionStorage.setItem('aitip', '1'); } catch (e) {} }, 4000);
+  $('#aitip').onclick = () => { $('#aitip').hidden = true; aiOpen(true); }; }
 </script>
 </body>
 </html>
