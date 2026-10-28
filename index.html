@@ -331,7 +331,7 @@ if (S.assistant || /[?&]ai=1/.test(location.search)) $('#aifab').hidden = false;
 if (!$('#aifab').hidden) { const TIPS = ['أنا مساعد ذكي 🤖 تحتاج مساعدة؟', 'اسألني عن أي صنف 👋', 'تبحث عن شيء معيّن؟ اكتب لي وأنا أدوّره لك'];
   let ti = 0, tt = 0; const tip = $('#aitip');
   const showTip = () => { if (!$('#aibox').hidden || document.hidden) return; tip.textContent = TIPS[ti++ % TIPS.length]; tip.hidden = false; clearTimeout(tt); tt = setTimeout(() => tip.hidden = true, 6000); };
-  setTimeout(showTip, 4000); setInterval(showTip, 45000);
+  setTimeout(showTip, 4000); setInterval(showTip, 30000);
   tip.onclick = () => { tip.hidden = true; aiOpen(true); }; }
 </script>
 </body>
