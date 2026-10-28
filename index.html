@@ -67,6 +67,12 @@
   </div>
 </div>
 <div class="sbar" id="sbar" hidden><span id="sbtxt"></span><button id="sbgo">أرسل الطلب ←</button></div>
+<button class="aifab" id="aifab" hidden aria-label="المساعد"><span>💬</span> مساعد</button>
+<div class="aibox" id="aibox" hidden>
+  <div class="aihd"><b>مساعد الكتالوج</b><small>يساعدك تلقى الأصناف</small><button id="aix" aria-label="إغلاق">✕</button></div>
+  <div class="aimsgs" id="aimsgs"></div>
+  <form class="aiform" id="aiform"><input id="aiq" placeholder="اكتب ما تبحث عنه… مثلاً: ستاند كيك دوّار" autocomplete="off" maxlength="300"><button>إرسال</button></form>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -276,6 +282,45 @@ document.querySelectorAll('#lb .qty button').forEach(b => b.onclick = () => { $(
 $('#lbadd').onclick = () => { const v = $('#lbv') ? +$('#lbv').value : 0, q = Math.max(1, +$('#lbq').value || 1);
   addToCart(LB.id, v, q); const b = $('#lbadd'); b.textContent = 'أُضيف ✓'; b.classList.add('done');
   setTimeout(() => { b.textContent = 'أضف للطلب'; b.classList.remove('done'); }, 1200); toast(`أُضيف ${LB.ar} × ${q}`); };
+
+/* ---------- assistant ---------- */
+const AN = t => String(t || '').toLowerCase().replace(/[ًٌٍَُِّْـ]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي');
+const SYN = [['صحن','طبق','ماعون','صحون','اطباق','مواعين'],['ملاحه','مملحه','ملح','ملاحات'],['كوب','كاس','كاسه','اكواب','فنجان','فناجين','مج'],['ستاند','حامل','ستان'],['غطا','غطاء','كفر','قبه'],['صينيه','طبسي','صواني','تريه'],['ابريق','براد','بقراج','دله'],['ملعقه','معلقه','ملاعق','مغرفه','كفكير'],['سكين','موس','سكاكين'],['مصفاه','مصفي','مصافي','مصفايه'],['مبشره','برشه','براشه'],['ثلج','جليد'],['قهوه','كافي','قهوا'],['شاي','تاي'],['خبز','عيش','كسره'],['بوفيه','بوفي','اوبن بوفيه'],['بار','كوكتيل','عصير'],['كيك','كيكه','تورته','حلويات'],['زيت','خل','زيوت'],['منديل','مناديل','محارم','فاين'],['فلفل','بهارات','بزار'],['سلطه','سلطات'],['بيتزا','بيدزا'],['ستيك','لحم','شوايه','مشاوي'],['شوكه','شوك','فرشيطه']];
+const SYNM = {}; SYN.forEach(g => g.forEach(w => SYNM[w] = g));
+let AIH = [];
+function aiCands(q) {
+  const toks = AN(q).split(/[^؀-ۿa-z0-9]+/).filter(w => w.length > 1);
+  const exp = toks.map(w => { const base = w.replace(/^(ال|وال|بال|لل)/, ''); return [...new Set([w, base, ...(SYNM[base] || SYNM[w] || [])])]; });
+  if (!exp.length) return [];
+  const sc = DATA.products.map(p => { const t = AN(p.ar + ' ' + p.g + ' ' + p.v.map(v => v.ar).join(' '));
+    let s = 0; exp.forEach(alts => { if (alts.some(a => t.includes(a))) s += 2; else if (alts.some(a => a.length > 3 && t.includes(a.slice(0, -1)))) s += 1; });
+    return [s + (nImg(p) ? 0.3 : 0), p]; }).filter(x => x[0] >= 1).sort((a, b) => b[0] - a[0]);
+  const seen = new Set(), out = [];
+  for (const [, p] of sc) { const k = p.ar + '|' + p.g; if (seen.has(k) && out.length > 20) continue; seen.add(k); out.push(p); if (out.length >= 50) break; }
+  return out;
+}
+function aiMsg(role, html) { const d = document.createElement('div'); d.className = 'aim ' + role; d.innerHTML = html; $('#aimsgs').appendChild(d); $('#aimsgs').scrollTop = 1e9; return d; }
+function aiCards(ids) { return ids.length ? `<div class="aicards">${ids.map(id => { const p = P[id]; if (!p) return '';
+  return `<button class="aicard" data-id="${p.id}"><img src="${thumbOf(p)}" data-fb="thumb/${p.id}.jpg" ${FB} alt=""><span>${esc(p.ar)}</span><small>${p.id}${p.v.length > 1 ? ' · ' + p.v.length + ' مقاسات' : ''}</small></button>`; }).join('')}</div>` : ''; }
+function aiOpen(o) { $('#aibox').hidden = !o; if (o) { if (!$('#aimsgs').children.length) aiMsg('a', 'أهلاً بك 👋 اكتب لي ما تبحث عنه، مثلاً «طقم ملاحات للطاولة» أو «غطاء أكريليك للبوفيه»، وأقترح لك الأصناف المناسبة.'); setTimeout(() => $('#aiq').focus(), 50); if (layer() !== 'ai') pushLayer('ai'); } else if (layer() === 'ai') history.back(); }
+$('#aifab').onclick = () => aiOpen(true); $('#aix').onclick = () => aiOpen(false);
+window.addEventListener('popstate', () => { if (!$('#aibox').hidden && layer() !== 'ai') $('#aibox').hidden = true; });
+$('#aimsgs').addEventListener('click', e => { const c = e.target.closest('.aicard'); if (c) openLB(c.dataset.id); });
+$('#aiform').onsubmit = async e => {
+  e.preventDefault(); const q = $('#aiq').value.trim(); if (!q) return; $('#aiq').value = '';
+  aiMsg('u', esc(q)); const wait = aiMsg('a wait', '<span class="dots"><i></i><i></i><i></i></span>');
+  const cands = aiCands(q), local = cands.slice(0, 6).map(p => p.id);
+  let reply = '', ids = [];
+  try {
+    const r = await fetch(S.appsScriptUrl, { method: 'POST', body: JSON.stringify({ action: 'ask', q, hist: AIH, cands: cands.map(p => ({ id: p.id, ar: p.ar, g: p.g, sz: p.v.map(v => v.ar).slice(0, 4).join('، ') })) }) });
+    const j = await r.json(); if (!j.ok) throw new Error(j.error || 'err'); reply = j.reply; ids = j.ids || [];
+  } catch (err) {
+    reply = local.length ? 'هذه أقرب الأصناف لما كتبت:' : 'لم أجد صنفاً مطابقاً. جرّب كلمة أخرى أو تصفّح التصنيفات.'; ids = local;
+  }
+  wait.remove(); aiMsg('a', esc(reply).replace(/\n/g, '<br>') + aiCards(ids));
+  AIH.push({ r: 'u', t: q }, { r: 'a', t: reply + (ids.length ? ' [' + ids.join(', ') + ']' : '') }); AIH = AIH.slice(-6);
+};
+if (S.assistant || /[?&]ai=1/.test(location.search)) $('#aifab').hidden = false;
 </script>
 </body>
 </html>

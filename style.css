@@ -236,3 +236,24 @@ body.has-sbar .toast{bottom:84px}
 .qt tfoot td,.qt td:nth-child(6),.qt td:nth-child(7){white-space:nowrap}
 .lborig{font-size:13px;color:var(--accent);margin-top:4px;font-weight:700}
 .qorig{color:#b8913a;font-size:11px}
+
+.aifab{position:fixed;left:16px;bottom:20px;z-index:45;border:0;border-radius:999px;padding:12px 18px;background:var(--accent);color:#111;font:inherit;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.4);cursor:pointer}
+body.has-sbar .aifab{bottom:84px}
+.aibox{position:fixed;left:12px;bottom:12px;z-index:60;width:min(400px,calc(100vw - 24px));height:min(600px,calc(100vh - 90px));background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:16px;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.55);overflow:hidden}
+.aibox[hidden]{display:none}
+.aihd{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--chip)}
+.aihd small{color:var(--muted);flex:1}.aihd button{border:0;background:transparent;color:var(--ink);font-size:18px;cursor:pointer}
+.aimsgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.aim{max-width:88%;padding:10px 12px;border-radius:14px;line-height:1.7;font-size:14px}
+.aim.u{align-self:flex-start;background:var(--accent);color:#111;border-bottom-right-radius:4px}
+.aim.a{align-self:flex-end;background:var(--chip);border-bottom-left-radius:4px}
+.aicards{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+.aicard{display:flex;flex-direction:column;align-items:center;gap:4px;background:#fff;color:#1d2433;border:0;border-radius:10px;padding:8px;cursor:pointer;font:inherit;font-size:12px;text-align:center}
+.aicard img{width:100%;height:84px;object-fit:contain}.aicard small{color:#777}
+.aiform{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.aiform input{flex:1;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+.aiform button{border:0;border-radius:10px;padding:0 16px;background:var(--accent);color:#111;font:inherit;font-weight:700;cursor:pointer}
+.dots i{display:inline-block;width:7px;height:7px;margin:0 2px;border-radius:50%;background:var(--muted);animation:dt 1s infinite}
+.dots i:nth-child(2){animation-delay:.2s}.dots i:nth-child(3){animation-delay:.4s}
+@keyframes dt{0%,100%{opacity:.25}50%{opacity:1}}
+#lb{z-index:70}
