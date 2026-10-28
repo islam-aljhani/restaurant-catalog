@@ -324,7 +324,10 @@ $('#aiform').onsubmit = async e => {
   } catch (err) {
     reply = local.length ? 'هذه أقرب الأصناف لما كتبت:' : 'لم أجد صنفاً مطابقاً. جرّب كلمة أخرى أو تصفّح التصنيفات.'; ids = local;
   }
-  wait.remove(); aiMsg('a', esc(reply).replace(/\n/g, '<br>') + aiCards(ids));
+  wait.remove(); const m = aiMsg('a', esc(reply).replace(/\n/g, '<br>') + aiCards(ids) + '<div class="airate">هل كانت الإجابة مفيدة؟ <button data-r="1" aria-label="مفيدة">👍</button><button data-r="0" aria-label="غير مفيدة">👎</button></div>');
+  m.querySelectorAll('.airate button').forEach(btn => btn.onclick = () => { const ok = btn.dataset.r === '1';
+    m.querySelector('.airate').textContent = ok ? 'شكراً لتقييمك 🌹' : 'شكراً، سنعمل على تحسينه 🙏 ويمكنك إرسال طلبك لنا مباشرة على واتساب.';
+    try { fetch(S.appsScriptUrl, { method: 'POST', body: JSON.stringify({ action: 'rate', q, reply, ids, r: ok ? 1 : 0 }) }); } catch (e) {} });
   AIH.push({ r: 'u', t: q }, { r: 'a', t: reply + (ids.length ? ' [' + ids.join(', ') + ']' : '') }); AIH = AIH.slice(-6);
 };
 if (S.assistant || /[?&]ai=1/.test(location.search)) $('#aifab').hidden = false;

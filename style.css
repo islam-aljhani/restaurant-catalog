@@ -247,6 +247,9 @@ body.has-sbar .aifab{bottom:84px}
 .aim{max-width:88%;padding:10px 12px;border-radius:14px;line-height:1.7;font-size:14px}
 .aim.u{align-self:flex-start;background:var(--accent);color:#111;border-bottom-right-radius:4px}
 .aim.a{align-self:flex-end;background:var(--chip);border-bottom-left-radius:4px}
+.airate{margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,.1);font-size:12.5px;color:var(--muted,#9aa4b2);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.airate button{border:1px solid rgba(201,165,76,.5);background:transparent;border-radius:999px;padding:2px 10px;font-size:15px;cursor:pointer}
+.airate button:active{background:var(--accent)}
 .aicards{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
 .aicard{display:flex;flex-direction:column;align-items:center;gap:4px;background:#fff;color:#1d2433;border:0;border-radius:10px;padding:8px;cursor:pointer;font:inherit;font-size:12px;text-align:center}
 .aicard img{width:100%;height:84px;object-fit:contain}.aicard small{color:#777}
